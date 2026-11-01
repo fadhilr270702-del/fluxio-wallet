@@ -1,0 +1,1059 @@
+/**
+ * Design tokens.
+ *
+ * This file started as a verbatim copy of apps/web/src/styles/design.css
+ * — it no longer "mostly still is" one, corrected here (prompt 0131
+ * Revision 4) after that exact claim was checked directly rather than
+ * trusted: a plain diff against apps/web's own current file returns
+ * ~2,200 differing lines out of apps/web's ~1,900, including
+ * --slate-950/--slate-800's own base values (this file's #050505/#14161D
+ * vs. apps/web's #16262c/#1f333a) and several tokens (--line-glass,
+ * --glass-panel-bg, the whole heading-sweep-animation token family on
+ * apps/web's side) that only ever existed on one side. admin/ and apps/web
+ * are separate Vite apps with no shared package between them, so nothing
+ * here enforces parity either way — treat every "should this be mirrored"
+ * question as needing its own current-diff check, not this comment's
+ * word for it, since staying accurate here has already failed once.
+ *
+ * One deliberate, permanent divergence: --gold/--gold-600/--shadow-gold
+ * hold the *admin panel's own* brand teal (#2DD4BF), not apps/web's warm
+ * gold — the admin panel's accent was rebranded to teal; apps/web's wasn't
+ * asked to change and shouldn't be touched to match. The variable names
+ * stayed "gold" on purpose (every component already references
+ * var(--gold)/var(--gold-600)/var(--accent)/var(--shadow-gold) — renaming
+ * them would mean editing every call site instead of just the token
+ * values, which is exactly the "don't hardcode per component" point of
+ * having tokens at all). --status-warning/--status-warning-600 are new in
+ * this copy — the old gold values, decoupled from "brand accent" so the
+ * warning/in-progress badges (Badge.jsx's warning/sending/partial
+ * variants) don't move color just because the brand accent did; they'd
+ * otherwise collapse into the same teal as the success/published badges
+ * (--teal, a separate, unrelated pre-existing token) and become hard to
+ * tell apart at a glance.
+ *
+ * Palette/type approach: warm paper background, deep slate ink, generous
+ * whitespace, a fluid type scale, and soft editorial motion — inspired by
+ * fplus.ai's restrained, typography-led aesthetic. Light is the default
+ * reading mode (like the reference); [data-theme="dark"] swaps to a slate
+ * surface with the same accents.
+ */
+:root{
+  --paper: #faf7f0;
+  --slate: #273f48;
+  /* Flat solid black, deliberately — not near-black, no ambient glow (see
+     body rule below, which used to layer a radial-gradient teal glow here
+     and no longer does). --slate-800 (dark-mode --panel) stays a step
+     lighter, unchanged — it's still the glass fallback's solid color for
+     browsers without backdrop-filter support. */
+  --slate-950: #050505;
+  --slate-800: #14161D;
+  --slate-600: #3a5661;
+  --gold: #2DD4BF;
+  --gold-600: #0D9488;
+  --teal: #6fb3a8;
+  --teal-300: #a9dbd3;
+  --status-warning: #dbb057;
+  --status-warning-600: #c99a3f;
+  /* "In progress" blue for Badge.jsx's sending/queued broadcast-status
+     variants — same pairing convention as --status-warning/-600 above
+     (base tone + a darker text-level shade), admin-only (no apps/web
+     broadcast UI exists to keep this in sync with). */
+  --status-info: #7cb0e0;
+  --status-info-600: #4a7fb0;
+  /* Prompt 0142 Revision 1 — the "danger/error" red this codebase has
+     always used (`.form-error`, `.field-hint--error`, `.btn-danger`) but
+     never actually named as a token, repeating the same literal hex at
+     each call site instead. Named here and consolidated into every one of
+     those existing call sites rather than left as a fourth independent
+     copy of the same color. No separate base tone the way
+     `--status-warning`/`--status-info` each have one: this codebase has
+     only ever used ONE red shade per theme (never two), for both text AND
+     the alpha-blended backgrounds/borders that reuse the same underlying
+     192,57,43 triple at a lower opacity (see `.form-error`'s own rule) —
+     inventing a second, distinct "base" tone with no real prior usage to
+     draw from would be a genuinely new color choice, not a consolidation
+     of an existing one. `-600` genuinely does need a dark-mode override
+     (see `[data-theme="dark"]` below) — `#c0392b` was already too dark to
+     read against a near-black panel before this token existed, which is
+     why `.form-error` etc. already special-cased dark mode's text color
+     even without a named token backing it. */
+  --status-danger-600: #c0392b;
+  /* 0.80 alpha (was 0.62) — darkened in prompt 0131 Revision 4, admin-only
+     (never mirrored to apps/web; see this file's own header comment on why
+     that's correct now, not an oversight). Revision 3's own measurement
+     found 0.62 already failed WCAG AA's 4.5:1 floor for stat-tile__label/
+     __hint text even against a fully opaque white background, well before
+     the glass panel or its opacity ever entered the picture — a
+     pre-existing gap this token alone could fix, once identified as the
+     actual lever (see --glass-panel-bg's own comment below for the
+     "why not that token instead" side of this). Tested 0.70/0.75/0.80
+     against the real rendered dashboard at the target --glass-panel-bg
+     0.35 (this same revision, pixel-sampled from real screenshots): 0.70
+     -> worst 3.79:1, 0.75 -> worst 4.22:1, both still fail; 0.80 -> worst
+     4.81:1 measured AT THE TIME, the first value clearing 4.5:1 across
+     every stat-tile's own label/hint text — chosen as the smallest of the
+     three tested values that actually passed that measurement, not the
+     highest available.
+     CONSCIOUS AA DECISION (prompt 0131 Revision 5, superseding the 4.81:1
+     figure above — see --glass-panel-bg's own comment below for the full
+     correction): a more thorough scan (the entire panel area, not one
+     sample point) found the true worst case at this exact 0.80 alpha is
+     3.64:1 — .stat-tile__hint on the "Telegram subscribers" tile,
+     wherever it happens to sit over the darkest patch of whichever
+     background image is configured. This does NOT clear WCAG AA, and no
+     value tested since (including four blur/fill combinations in
+     Revision 5 itself) has cleared it either — it is accepted here,
+     consciously, not silently: this is an internal admin tool behind
+     authentication, not a public-facing surface, and 0.80 is kept as the
+     best tradeoff found so far between legibility and the glass effect's
+     own visual point, rather than continuing to push a token that keeps
+     coming up short. A real fix, if wanted later, likely needs either an
+     even higher --ink-muted alpha (trading more of the "muted" look
+     away) or a text-shadow/scrim behind small text specifically, not
+     another pass at these two tokens alone. */
+  --ink-muted: rgba(39,43,48,0.80);
+  --line: rgba(39,63,72,0.12);
+  /* Softer than --line — used only on panel-like surfaces (.card,
+     .stat-tile, .table-wrap, .login-card, .sidebar) for a "glass edge"
+     look. --line itself stays untouched since it's used far more broadly
+     (table cell borders, dividers, form inputs) where a crisper line is
+     still wanted. */
+  --line-glass: rgba(39,63,72,0.08);
+  /* Glassmorphism panel fill, used only under the @supports(backdrop-filter)
+     block below. 0.35 (was 0.65) — lowered for real in prompt 0131
+     Revision 4, unblocked by Revision 3's own finding that the actual
+     obstacle to lowering it was never this token: Revision 3 tested
+     0.65/0.55/0.45/0.35 and found .stat-tile__label/__hint text (11-11.5px,
+     WCAG 4.5:1) failed at EVERY value including the then-current 0.65
+     (worst 3.24:1) — a pre-existing gap this token's own opacity was
+     wrongly guarding, since --ink-muted (see that token's own comment
+     above) was already too light to hit 4.5:1 even against fully opaque
+     white, with or without any glass involved. Once --ink-muted was
+     darkened to 0.80 alpha (this same revision) specifically to compensate
+     at THIS glass value, 0.35 was verified — AT THE TIME — to reach a
+     worst-case 4.81:1 across every stat-tile.
+     CORRECTION (prompt 0131 Revision 5): that 4.81:1 figure was wrong, not
+     just superseded — it came from sampling only a single background point
+     near one fixed panel corner. A full scan of the ENTIRE panel area
+     (excluding every sibling icon/label/value/hint box, not just the one
+     element being measured) found a worse point elsewhere in the SAME
+     panel this whole time: .stat-tile__hint on the "Telegram subscribers"
+     tile measures 3.64:1 at this exact 0.35/0.80 combination — it has
+     never actually passed WCAG AA's 4.5:1 floor. See --ink-muted's own
+     comment below for the conscious, documented decision to accept this
+     rather than keep chasing a token that was never going to fully close
+     it (this repo's own internal tool, not a public-facing surface). */
+  --glass-panel-bg: rgba(255,255,255,0.35);
+  /* Backdrop-blur radius, split per theme in prompt 0131 Revision 5 —
+     mirrors --glass-panel-bg's own light/dark split immediately above,
+     for the same reason: a shared, theme-unscoped @supports rule (see
+     that block's own long comment on why it must stay ONE rule, last in
+     the cascade, rather than two theme-scoped ones) still needs a
+     per-theme VALUE, which a plain CSS custom property gives it without
+     touching that rule's own structure at all. Light: 8px (was a shared
+     16px before this revision) — user's own visual review of Revision 4
+     found the glass "still too blurred," losing the point of having a
+     background image behind it at all; Revision 5 rendered 4 candidates
+     (8px/4px blur × 0.35/0.25 fill) and the user picked this one (blur
+     8px, fill kept at 0.35) specifically. Dark: 16px, unchanged — dark
+     mode's own look was explicitly approved as-is and was never part of
+     this investigation; verified via computed style after this change
+     (not just this file's own diff) that dark mode's backdrop-filter
+     still reads exactly blur(16px), since a typo in either token's own
+     value here would otherwise change dark mode silently. */
+  --glass-blur: 8px;
+
+  /* Modal "more content below" scroll-fade color (prompt 0132 Revision 4,
+     admin.css's .modal-card__fade). Deliberately its own token, not a
+     reuse of --glass-panel-bg — that token's alpha (0.35 here) was tuned
+     for a panel TINT sitting over an already-blurred background image, and
+     measured (via an isolated on/off pixel diff at identical scroll/
+     content state, not eyeballed) to be nearly imperceptible as a scroll
+     indicator specifically: avg channel diff ~6.8/255 in light mode. A
+     dark, low-alpha shadow reads as "recession"/depth against a light
+     surface far more legibly than a translucent white tint does — the
+     opposite direction from --glass-panel-bg's own white-tint approach —
+     which is why this is a separate, purpose-built token rather than an
+     alpha bump to the existing one. */
+  --modal-fade-color: rgba(20,22,29,0.22);
+
+  --bg: var(--paper);
+  --panel: #ffffff;
+  --ink: var(--slate);
+  --muted: var(--ink-muted);
+  --accent: var(--gold);
+  --accent-2: var(--teal);
+  --glass: rgba(39,63,72,0.04);
+  --card-grad: linear-gradient(135deg,var(--accent),var(--accent-2));
+
+  --radius: 20px;
+  --radius-sm: 12px;
+  --radius-pill: 999px;
+
+  --shadow-1: 0 1px 2px rgba(16,24,28,0.05), 0 16px 32px rgba(16,24,28,0.07);
+  --shadow-gold: 0 14px 34px rgba(45,212,191,0.28);
+
+  --ease-out: cubic-bezier(.16,1,.3,1);
+  --ease-in-out: cubic-bezier(.65,0,.35,1);
+  --dur-fast: .28s;
+  --dur: .6s;
+  --dur-slow: .9s;
+
+  --font-display: "Onest", ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+  --font-body: "IBM Plex Sans", ui-sans-serif, system-ui, "Segoe UI", Arial, sans-serif;
+
+  --container: 76rem;
+  --gutter: clamp(1.25rem, 4vw, 3rem);
+
+  --step--1: clamp(.83rem, .78rem + .24vw, .95rem);
+  --step-0: clamp(1rem, .94rem + .3vw, 1.05rem);
+  --step-1: clamp(1.2rem, 1.09rem + .55vw, 1.5rem);
+  --step-2: clamp(1.5rem, 1.28rem + 1.1vw, 2.1rem);
+  --step-3: clamp(2rem, 1.55rem + 2.25vw, 3.2rem);
+  --step-4: clamp(2.6rem, 1.7rem + 4.5vw, 5.2rem);
+}
+
+[data-theme="dark"]{
+  --bg: var(--slate-950);
+  --panel: var(--slate-800);
+  --ink: var(--paper);
+  --muted: rgba(250,247,240,0.62);
+  --line: rgba(250,247,240,0.12);
+  --line-glass: rgba(250,247,240,0.08);
+  --glass: rgba(250,247,240,0.05);
+  /* Deliberately near-invisible against flat #050505 — acknowledged, not a
+     bug. There's nothing textured behind these panels for backdrop-filter
+     to actually blur, only the flat page background, so the visible effect
+     here is mostly the subtle whitish tint, not the blur itself. */
+  --glass-panel-bg: rgba(255,255,255,0.05);
+  /* 16px, unchanged (prompt 0131 Revision 5) — dark mode's own blur was
+     never in question; light mode's own --glass-blur (see that token's
+     own comment in :root above) dropped to 8px, dark stays at the
+     original, already-approved value. */
+  --glass-blur: 16px;
+  /* Dark mode's own scroll-fade (see this token's own comment in :root
+     above) fades toward a soft LIGHT glow rather than more black — the
+     background here is already near-black (--slate-950/--slate-800), so
+     an even-darker fade would have the exact same low-contrast problem
+     --glass-panel-bg's white tint had in light mode; a light-tinted fade
+     is what actually reads clearly against a dark surface. */
+  --modal-fade-color: rgba(255,255,255,0.16);
+  --shadow-1: 0 1px 2px rgba(0,0,0,0.24), 0 20px 40px rgba(0,0,0,0.35);
+  /* --gold-600 is used for icon/text-level accent (not backgrounds/borders,
+     which stay theme-invariant like --gold itself) — a darker teal chosen
+     for contrast on a white panel reads muddy on a dark slate one, so this
+     is the first token in this file to actually need a dark-mode swap:
+     lighter here, same reasoning as .badge--published's --teal -> --teal-300. */
+  --gold-600: #5EEAD4;
+  /* Prompt 0142 Revision 1 — same reasoning as --gold-600 immediately
+     above: #c0392b reads muddy/low-contrast against a near-black panel,
+     lightened for dark mode — this is exactly the swap .form-error's own
+     `[data-theme="dark"] .form-error{color:#e8796a}` already made before
+     this token existed; this override is what lets that rule (and every
+     other danger-red text usage) collapse onto one shared token instead
+     of repeating the light/dark pair at each call site. */
+  --status-danger-600: #e8796a;
+}
+
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0;
+  font-family:var(--font-body);
+  background:var(--bg);
+  color:var(--ink);
+  transition:background var(--dur) var(--ease-out), color var(--dur) var(--ease-out);
+  -webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;
+}
+/* Background image, both themes (prompt 0131 Revision 2 — light mode's own
+   rule used to not exist at all, plain flat --bg only; see that rule below
+   for why it does now) — makes the glassmorphism cards' blur actually
+   visible (dark mode previously had nothing but flat #050505 behind them;
+   light mode had nothing but flat --paper). Layered on `body` itself, not
+   baked into the --bg token — same reasoning as the earlier (now-removed)
+   glow: --bg is also a plain flat fill on small elements like form inputs,
+   so a token-level image would render its own tiny cropped fragment per
+   input instead of one page image. Longhand background-image (not the
+   `background` shorthand) so background-color is left alone, still
+   falling through to the base rule above (#050505 dark / --paper light) as
+   the fallback color before the image loads / if it fails. A single value
+   in each of size/position/attachment/repeat below applies to both layers
+   per the CSS spec — no need to repeat per layer. */
+[data-theme="dark"] body{
+  background-image:
+    linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)),
+    url('/bg-admin-dark.jpg');
+  background-size:cover;
+  background-position:center;
+  background-attachment:fixed;
+  background-repeat:no-repeat;
+}
+/* Light mode's own version (prompt 0131 Revision 2, new — light mode was
+   plain flat --paper until now). Mirrors the dark rule above exactly
+   (longhand background-image, overlay gradient over the url(), same
+   size/position/attachment/repeat) with one deliberate difference: the
+   overlay tint is ivory (--paper's own rgb(250,247,240)), not black —
+   darkening a light-mode surface with a black scrim would fight the
+   theme's own light/airy intent and drag --ink's dark-slate text toward
+   low contrast against an uncontrolled photo underneath it. 0.6 (the same
+   opacity as dark mode's own overlay, not pushed toward the 0.75 cap) —
+   verified by measurement, not eyeballed: rendered the real dashboard at
+   1920x1080, found every point genuinely showing raw body background
+   (walking each sampled point's own element chain for a fully transparent
+   background-color/-image up to body itself, so a card/sidebar/topbar
+   never gets mistaken for open background), and computed the WCAG
+   relative-luminance contrast ratio between --ink (#273f48) and the
+   actual rendered pixel at each of those points against this exact
+   overlay. Worst point found: 5.35:1 — clears WCAG AA's 4.5:1 body-text
+   threshold with real headroom, so 0.6 was kept rather than escalated. */
+[data-theme="light"] body{
+  background-image:
+    linear-gradient(rgba(250,247,240,0.6), rgba(250,247,240,0.6)),
+    url('/bg-admin-light.jpg');
+  background-size:cover;
+  background-position:center;
+  background-attachment:fixed;
+  background-repeat:no-repeat;
+}
+h1,h2,h3,h4,.font-display{font-family:var(--font-display);letter-spacing:-0.02em;margin:0}
+p{line-height:1.65}
+a{color:inherit}
+::selection{background:var(--accent);color:var(--slate-950)}
+
+.container{max-width:var(--container);margin:0 auto;padding-inline:var(--gutter)}
+.eyebrow{
+  font-size:12.5px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--muted);display:flex;align-items:center;gap:10px;
+}
+.eyebrow::before{content:"";width:22px;height:1px;background:var(--gold);display:inline-block}
+
+/* Layout (dashboard app-shell) */
+.app-root{display:grid;grid-template-columns:260px 1fr;min-height:100vh;gap:20px}
+.app-main{padding:28px 36px}
+.app-content{margin-top:20px}
+
+.sidebar{background:var(--panel);box-shadow:var(--shadow-1);padding:26px;border-radius:var(--radius);height:calc(100vh - 40px);position:sticky;top:20px;display:flex;flex-direction:column;align-items:flex-start;gap:12px;width:260px;border:1px solid var(--line-glass)}
+/* color is explicit here (not left to inherit) — a <button> doesn't
+   inherit `color` from body/--ink the way a <div>/<span> does; browsers
+   give buttons their own default text color, which stayed dark in dark
+   mode and read as invisible against the dark panel. */
+.sidebar .brand{background:transparent;border:none;cursor:pointer;color:var(--ink)}
+.sidebar .sidebar-nav{display:flex;flex-direction:column;gap:8px;width:100%}
+.sidebar .nav-item{display:flex;align-items:center;gap:12px;padding:10px;border-radius:var(--radius-sm);color:var(--muted);text-decoration:none;transition:background var(--dur-fast),color var(--dur-fast)}
+/* --ink (theme-aware), not --slate (a fixed, always-dark raw color) —
+   the old value read fine in light mode by coincidence (--ink === --slate
+   there) but stayed dark-on-dark, invisible, in dark mode. */
+.sidebar .nav-item:hover{background:var(--glass);color:var(--ink)}
+.sidebar .nav-item .icon{width:20px;height:20px;fill:currentColor}
+
+/* Navbar (dashboard) — a 3-column grid, not flex space-between: the left
+   (logo) and right (email/role/toggle/logout) groups are very different
+   widths, and space-between can't truly center a middle item between two
+   unequal-width neighbors. Grid's middle `auto` column always sits exactly
+   centered on the bar regardless of what's either side of it. */
+.navbar{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:16px;padding:16px 24px;background:transparent}
+.nav-left{justify-self:start}
+.nav-center{justify-self:center}
+.nav-right{justify-self:end}
+.nav-left .logo{font-weight:800;color:var(--accent);font-size:20px;border:none;background:transparent;cursor:pointer}
+.nav-actions{display:flex;gap:10px;align-items:center}
+.icon-btn{background:var(--panel);border:1px solid var(--line);padding:8px;border-radius:var(--radius-sm);color:var(--muted);cursor:pointer;transition:color var(--dur-fast),border-color var(--dur-fast)}
+.icon-btn:hover{color:var(--slate);border-color:var(--gold)}
+
+/* Header clock — see HeaderClock.jsx. Fills the middle of the topbar,
+   which used to just be empty space between the logo and the account
+   actions. tabular-nums keeps the ticking seconds digit from jittering
+   the layout width every second. */
+.header-clock{display:flex;flex-direction:column;align-items:center;line-height:1.3}
+.header-clock__time{font-family:var(--font-display);font-weight:700;font-size:17px;letter-spacing:.02em;color:var(--ink);font-variant-numeric:tabular-nums}
+.header-clock__date{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-top:1px}
+@media (max-width:820px){.nav-center{display:none}}
+
+/* Dark mode only, and only on the header's bare-text elements (no
+   background of their own to lean on, unlike the role badge/avatar which
+   already have their own tinted pill/circle) — a soft shadow behind just
+   the text, not a solid box, to keep it legible once .topbar goes
+   translucent (see the glassmorphism block in admin.css) over the
+   background image. */
+[data-theme="dark"] .nav-left .logo,
+[data-theme="dark"] .header-clock__time,
+[data-theme="dark"] .header-clock__date{
+  text-shadow:0 1px 4px rgba(0,0,0,0.6);
+}
+
+/* Cards & visuals */
+.card{background:var(--panel);padding:22px;border-radius:var(--radius);color:var(--muted);box-shadow:var(--shadow-1);border:1px solid var(--line-glass)}
+.card .head{display:flex;justify-content:space-between;align-items:center}
+
+/* Hover-glow — scoped to .card/.stat-tile/.login-card/.page-head
+   specifically (real discrete "cards", .page-head joining them by explicit
+   request for full consistency), not .table-wrap/.sidebar (structural
+   containers you spend most of a page hovering over — a glow reacting to
+   that would be the distraction this is meant to avoid, not a delightful
+   touch). */
+.card,.stat-tile,.login-card,.page-head{transition:border-color var(--dur-fast) var(--ease-out),box-shadow var(--dur-fast) var(--ease-out)}
+.card:hover,.stat-tile:hover,.login-card:hover,.page-head:hover{
+  border-color:rgba(45,212,191,0.5);
+  box-shadow:var(--shadow-1), 0 0 0 1px rgba(45,212,191,0.15), 0 0 24px rgba(45,212,191,0.12);
+}
+/* Glassmorphism block for .card/.stat-tile/.table-wrap/.login-card/
+   .sidebar/.topbar moved to the very end of admin.css — see the comment
+   there for why (a cascade-order bug: it needs to load after every one of
+   those classes' own base rules, two of which live in admin.css itself). */
+
+.animated-card{background:var(--panel);padding:18px;border-radius:var(--radius-sm);position:relative;overflow:hidden}
+.animated-card:before{content:"";position:absolute;inset:0;background:var(--card-grad);opacity:0.05;mix-blend-mode:multiply}
+
+.icon{width:20px;height:20px;display:inline-block}
+
+@keyframes floaty{0%{transform:translateY(0)}50%{transform:translateY(-6px)}100%{transform:translateY(0)}}
+.float{animation:floaty 5s ease-in-out infinite}
+
+/* Dashboard — bento layout instead of one flat two-column split */
+.dashboard h1{margin-bottom:18px}
+/* auto-fit + 1fr, not a fixed repeat(3,...): with 5 stat tiles a fixed
+   3-column grid wraps to an unbalanced 3-then-2 second row with a dead gap
+   in the empty 3rd slot. auto-fit lets however many tiles land on a row
+   stretch to fill it evenly — 3 tiles still render identically to before
+   (Analytics/Broadcast-detail's own 3-tile rows), 5 fit on one row at
+   normal desktop widths. */
+.stat-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:24px}
+.stat-tile{display:flex;align-items:center;gap:14px;background:var(--panel);border:1px solid var(--line-glass);border-radius:var(--radius);padding:20px 22px;box-shadow:var(--shadow-1)}
+/* Soft brand-teal tint instead of the neutral --glass wash, and a touch
+   larger — makes the icon read as a deliberate accent, not a plain gray
+   circle. Still built from existing tokens only. */
+.stat-tile__icon{width:46px;height:46px;border-radius:13px;background:rgba(45,212,191,0.14);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.stat-tile__icon .icon{width:20px;height:20px;color:var(--gold-600)}
+.stat-tile__label{display:block;font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.stat-tile__value{display:block;font-family:var(--font-display);font-size:19px;font-weight:700;margin-top:2px}
+.stat-tile__hint{display:block;font-size:11px;color:var(--muted);margin-top:2px}
+/* Prompt 0190 — the subscribers tile's "other bot" pill (variant B, the
+   owner's pick from a rendered A/B; variant A and the phase-1 toggle were
+   deleted). white-space:nowrap is load-bearing: at 1536 the tile is
+   narrow enough that the longest bot name ("Bot Percobaan") wrapped
+   INSIDE the pill in phase 1 — the exact untidiness this prompt exists
+   to fix — so the pill never wraps, and padding/gap were tightened in
+   two MEASURED iterations (final: padding 2px 3px, gap 2px, prefix
+   tracking normal) so the longest name still fits within the tile's own
+   22px padding at 1536 with ~2.5px headroom — see the 0190 archive for
+   the real rect numbers. Existing tokens only. */
+.stat-tile__other-pill{display:inline-flex;align-items:center;gap:2px;margin-top:6px;padding:2px 3px;border-radius:var(--radius-pill);border:1px solid var(--line-glass);background:var(--glass);font-size:10.5px;color:var(--ink);white-space:nowrap}
+.stat-tile__other-pill__prefix{font-size:9px;text-transform:uppercase;color:var(--muted)}
+.dashboard-bento{display:grid;grid-template-columns:2fr 1fr;gap:20px;align-items:start}
+.dashboard-bento__main{display:flex;flex-direction:column;gap:16px}
+.dashboard-bento__side{display:flex;flex-direction:column;gap:16px}
+/* .chart-card (admin.css) carries its own margin-bottom for its other
+   usages (e.g. AnalyticsPage.jsx's chart followed by a plain analytics-grid,
+   not a gap-based flex column) — inside these two bento columns spacing is
+   already handled by `gap` above, so the per-card margin would double up. */
+.dashboard-bento__main > .chart-card,
+.dashboard-bento__side > .chart-card{margin-bottom:0}
+@media (max-width:900px){
+  .stat-row{grid-template-columns:1fr}
+  .dashboard-bento{grid-template-columns:1fr}
+}
+
+@media (max-width:900px){.app-root{grid-template-columns:1fr;}.sidebar{display:none}.app-main{padding:12px}}
+
+/* No border/backdrop-filter/translucent background here on purpose — those
+   are exactly what made the header read as a separate floating box instead
+   of a seamless extension of the page. background:var(--bg) is the same
+   token `body` itself uses (not `transparent`, which would let scrolled
+   content visually collide with the header's own text under sticky
+   positioning), so the header is pixel-identical to the page behind it in
+   both themes. */
+.topbar{position:sticky;top:0;z-index:40;padding:14px 22px;background:var(--bg)}
+.topbar .nav-actions{align-items:center}
+
+/* display:inline-flex + centering, not left at the default inline/inline-block:
+   a <button> roughly self-centers on its own, but a <Link>-as-button (an
+   <a> under the hood) doesn't get any of that for free, and neither gets
+   real control over icon+text alignment without an explicit flex box.
+   text-decoration:none is the other half of that same gap — buttons never
+   get underlined by default, but an <a> styled as .btn does, and nothing
+   here overrode it. */
+/* text-align:center added in prompt 0132 Revision 5 — a real, verified-not-
+   assumed root cause: History's "Edit isi" (a <Link>/<a>) wrapped to two
+   lines LEFT-aligned while "Ubah waktu" (a <button>) right next to it, same
+   .btn.btn-sm classes, wrapped CENTERED — computed styles confirmed
+   text-align:left on the <a> vs text-align:center on the <button>, a
+   browser UA-stylesheet default this class never overrode explicitly.
+   justify-content:center already centers a single-line label identically
+   regardless of tag, which is why this went unnoticed until a label
+   actually wrapped to two lines. Fixed once, here, at the shared class —
+   not a one-off patch on the Link — since .btn is used across ~17 files
+   admin-wide; the fix is purely corrective (single-line buttons/links look
+   identical either way) and only changes behavior for the specific
+   multi-line-wrap case, consistently, everywhere. */
+.btn{transition:all var(--dur-fast) var(--ease-out);font-family:var(--font-body);cursor:pointer;border-radius:var(--radius-sm);border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:10px 14px;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;text-align:center;gap:6px}
+.btn:hover{border-color:var(--gold)}
+.btn-primary{position:relative;overflow:hidden;background:var(--accent);color:var(--slate-950);border-radius:var(--radius-sm);padding:10px 14px;font-weight:600;border-color:transparent}
+.btn-primary:hover{background:var(--gold-600);box-shadow:var(--shadow-gold);transform:translateY(-2px)}
+.btn-primary:active{transform:translateY(0)}
+/* Diagonal sheen sweep on hover — a single deliberate highlight, not a
+   generic color-shift. */
+.btn-primary::after{content:"";position:absolute;top:0;bottom:0;left:-60%;width:40%;background:linear-gradient(115deg,transparent,rgba(255,255,255,0.55),transparent);transform:skewX(-20deg);transition:left .65s var(--ease-out)}
+.btn-primary:hover::after{left:130%}
+.btn-primary .icon{transition:transform .35s cubic-bezier(.34,1.56,.64,1)}
+.btn-primary:hover .icon{transform:translateY(2px)}
+@media (prefers-reduced-motion:reduce){.btn-primary::after{transition:none}}
+
+.wallet-card{background:var(--panel)}
+.wallet-card .actions{display:flex;gap:8px}
+
+.token-list li{padding:8px;border-radius:var(--radius-sm)}
+.token-avatar{box-shadow:var(--shadow-1)}
+.token-row{transition:transform .12s ease, box-shadow .12s ease}
+.token-row:hover{transform:translateY(-4px);box-shadow:var(--shadow-1)}
+
+.brand-logo{height:28px;display:block}
+
+/* Preloader — hand-built motion graphics (no video), see Preloader.jsx.
+   Drifting glow orbs + a rising particle field behind a spring-in logo
+   reveal (icon pops in, wordmark wipes in beside it), holding for HOLD_MS
+   with a slow idle pulse before AnimatePresence plays the exit fade. */
+.preloader-overlay{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;overflow:hidden;background:radial-gradient(circle at 50% 42%,#0c1a26,#050a14 72%)}
+.preloader-bg{position:absolute;inset:0;pointer-events:none}
+.preloader-orb{position:absolute;border-radius:50%;filter:blur(70px);opacity:.4}
+.preloader-orb--teal{background:radial-gradient(circle,rgba(111,179,168,0.9),transparent 70%)}
+.preloader-orb--gold{background:radial-gradient(circle,rgba(219,176,87,0.85),transparent 70%)}
+.preloader-particle{position:absolute;border-radius:50%;background:var(--teal-300);box-shadow:0 0 8px rgba(169,219,211,0.8)}
+.preloader-box{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;gap:20px}
+.preloader-reveal{display:flex;align-items:center;gap:14px}
+.preloader-reveal__icon{width:60px;height:60px;filter:drop-shadow(0 0 24px rgba(111,179,168,0.5))}
+.preloader-reveal__word{font-family:var(--font-display);font-weight:700;font-size:32px;letter-spacing:-0.01em;color:var(--paper);display:inline-block}
+.preloader-bar{width:120px;height:3px;border-radius:999px;background:rgba(250,247,240,0.16);overflow:hidden}
+.preloader-bar__fill{height:100%;width:100%;border-radius:999px;background:linear-gradient(90deg,var(--gold),var(--teal-300));transform-origin:left}
+.preloader-caption{color:rgba(250,247,240,0.72);font-size:12.5px;font-family:var(--font-display);letter-spacing:.14em;text-transform:uppercase}
+@media (prefers-reduced-motion:reduce){.preloader-orb,.preloader-particle{animation:none;display:none}}
+
+/* Footer */
+.app-footer{margin-top:22px;padding:28px 0;color:var(--muted);border-top:1px solid var(--line)}
+.app-footer .footer-inner{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.app-footer .chains img{height:24px;margin-right:8px;opacity:0.85;transition:opacity var(--dur-fast)}
+.app-footer .chains img:hover{opacity:1}
+.footer-note{font-size:13px;color:var(--muted)}
+
+/* ============================= Marketing site ============================= */
+
+/* No overflow-x here on purpose: an ancestor with overflow other than
+   visible silently disables position:sticky on descendants in most
+   browsers, which would break .h-scroll__sticky below. The horizontal
+   track it clips its own children (see .h-scroll__sticky{overflow:hidden}),
+   so nothing actually bleeds past the viewport at the body level. */
+.mkt-page{background:var(--bg);color:var(--ink);min-height:100vh}
+
+/* Horizontal scroll — see HorizontalScroll.jsx. A tall spacer
+   (slideCount * 100vh) provides scroll distance; the sticky viewport stays
+   pinned while the flex track is translated sideways by framer-motion in
+   step with scroll progress, turning vertical wheel/trackpad/keyboard
+   scrolling into slide-by-slide horizontal navigation.
+   Below 900px this collapses back to an ordinary stacked vertical layout —
+   scroll-hijacking on touchscreens is disorienting, so small screens just
+   get the sections in document order. */
+.h-scroll{position:relative}
+.h-scroll__sticky{position:sticky;top:0;height:100svh;overflow:hidden;display:flex}
+.h-scroll__track{display:flex;height:100%;will-change:transform}
+/* overflow-x is deliberately set too, not left at its 'visible' initial
+   value: per spec, when one axis is non-visible and the other is visible,
+   the visible one is force-computed to auto — so overflow-y:auto alone was
+   silently giving every slide its own horizontal scrollbox as well. No
+   slide should ever need to scroll at all; content is sized to fit instead
+   of falling back to a scrollbar. */
+.h-scroll__slide{flex:0 0 100vw;width:100vw;height:100%;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;padding:88px var(--gutter) 40px}
+.h-scroll__slide--hero{padding:0;display:block}
+.h-scroll__slide--hero .hero-mkt{height:100%;min-height:100%}
+.h-scroll__stack{display:flex;flex-direction:column;gap:16px;width:100%;max-width:var(--container);margin:0 auto}
+.h-scroll__stack--center{align-items:center;text-align:center}
+
+/* Below the nav logo, not top-right — top-right sat right under the fixed
+   nav's Download button and overlapped it. */
+.slide-tag{position:absolute;top:96px;left:var(--gutter);z-index:2;font-family:var(--font-display);font-size:12.5px;font-weight:600;letter-spacing:.08em;color:var(--muted);pointer-events:none}
+.slide-tag em{font-style:normal;opacity:.55}
+
+.slide-dots{position:absolute;right:20px;top:50%;transform:translateY(-50%);z-index:5;display:flex;flex-direction:column;gap:10px}
+.slide-dot{width:8px;height:8px;padding:0;border-radius:50%;border:1px solid var(--line);background:transparent;cursor:pointer;transition:background var(--dur-fast),border-color var(--dur-fast),transform var(--dur-fast)}
+.slide-dot:hover{border-color:var(--gold);transform:scale(1.2)}
+.slide-dot--active{background:var(--gold);border-color:var(--gold);transform:scale(1.3)}
+
+@media (max-width:900px){
+  .h-scroll{height:auto !important}
+  .h-scroll__sticky{position:static;height:auto;overflow:visible;display:block}
+  .h-scroll__track{display:block;transform:none !important;height:auto}
+  .h-scroll__slide{flex:none;width:100%;height:auto;min-height:100svh;padding:96px var(--gutter) 48px;overflow-y:visible}
+  .h-scroll__slide--hero{padding:0}
+  .h-scroll__slide--hero .hero-mkt{height:auto;min-height:100svh}
+  .slide-dots{display:none}
+  .slide-tag{display:none}
+}
+
+/* Fixed nav */
+.mkt-nav{position:fixed;inset:0 0 auto;z-index:60;pointer-events:none}
+.mkt-nav__bar{display:flex;align-items:center;justify-content:space-between;padding:clamp(18px,3vw,34px) var(--gutter)}
+.mkt-nav__logo{pointer-events:auto;display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--ink)}
+.mkt-nav__logo img{height:30px;width:auto;display:block}
+.mkt-nav__wordmark{font-family:var(--font-display);font-weight:700;font-size:18px;letter-spacing:-0.01em}
+.mkt-nav__actions{pointer-events:auto;display:flex;align-items:center;gap:14px}
+.mkt-nav__cta{display:inline-flex;align-items:center;gap:8px;padding:9px 18px;border-radius:var(--radius-pill);background:var(--accent);color:var(--slate-950);font-weight:600;font-size:13.5px;text-decoration:none;transition:background .3s var(--ease-out),transform .3s var(--ease-out),box-shadow .3s var(--ease-out)}
+.mkt-nav__cta:hover{background:var(--gold-600);transform:translateY(-2px);box-shadow:var(--shadow-gold)}
+.mkt-nav__cta .icon{width:15px;height:15px}
+.mkt-nav__toggle{display:flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:50%;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer;transition:border-color var(--dur-fast)}
+.mkt-nav__toggle:hover{border-color:var(--gold)}
+.mkt-nav__menu{display:flex;align-items:center;gap:12px;padding:8px 4px;background:transparent;border:none;cursor:pointer;color:var(--ink)}
+.mkt-nav__menu-label{font-size:13px;font-weight:600;letter-spacing:.14em;text-transform:uppercase}
+.mkt-nav__burger{display:flex;flex-direction:column;gap:5px;width:26px}
+.mkt-nav__burger-line{height:2px;width:26px;border-radius:2px;background:var(--ink);transition:background var(--dur-fast)}
+.mkt-nav__burger-line--accent{width:16px;align-self:flex-end;background:var(--gold)}
+
+/* Full-screen overlay menu */
+.mkt-overlay{position:fixed;inset:0;z-index:90;pointer-events:none;opacity:0;visibility:hidden;background:var(--slate-950);transition:opacity .45s var(--ease-out),visibility .45s}
+.mkt-overlay--open{opacity:0.98;visibility:visible;pointer-events:auto}
+.mkt-overlay__inner{position:relative;height:100%;display:flex;flex-direction:column;padding:clamp(18px,3vw,34px) var(--gutter);box-sizing:border-box}
+.mkt-overlay__top{display:flex;align-items:flex-start;justify-content:space-between}
+.mkt-overlay__logo{height:30px;width:auto;display:block;filter:brightness(0) invert(1)}
+.mkt-overlay__close{display:flex;align-items:center;gap:14px;background:transparent;border:none;cursor:pointer;color:var(--paper)}
+.mkt-overlay__close-label{font-size:13px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;opacity:.7}
+.mkt-overlay__close-x{position:relative;width:22px;height:22px;display:block}
+.mkt-overlay__close-x span{position:absolute;top:10px;left:0;height:2px;width:22px;border-radius:2px;background:var(--gold)}
+.mkt-overlay__close-x span:first-child{transform:rotate(45deg)}
+.mkt-overlay__close-x span:last-child{transform:rotate(-45deg)}
+.mkt-overlay__nav{flex:1;display:flex;flex-direction:column;justify-content:center;gap:4px;max-width:900px}
+.mkt-overlay__link{display:flex;align-items:baseline;gap:22px;padding:14px 4px;text-decoration:none;color:var(--paper);opacity:0;transform:translateY(14px);transition:opacity .5s var(--ease-out),transform .5s var(--ease-out);border-bottom:1px solid rgba(250,247,240,0.08)}
+.mkt-overlay--open .mkt-overlay__link{opacity:1;transform:none;transition-delay:calc(var(--i) * 0.05s + .1s)}
+.mkt-overlay__num{font-family:var(--font-display);font-size:13px;color:var(--gold);letter-spacing:.05em}
+.mkt-overlay__label{font-family:var(--font-display);font-size:clamp(28px,6vw,56px);font-weight:600;letter-spacing:-0.02em;transition:color var(--dur-fast)}
+.mkt-overlay__link:hover .mkt-overlay__label{color:var(--teal-300)}
+.mkt-overlay__foot{display:flex;justify-content:space-between;align-items:center;padding-top:18px;color:rgba(250,247,240,0.55);font-size:13px}
+.mkt-overlay__foot a{color:inherit;text-decoration:none}
+.mkt-overlay__foot a:hover{color:var(--paper)}
+
+/* Hero — asymmetric two-column: copy left, wallet mockup right (stacks to a
+   single centered column on narrow screens). Follows the site's own
+   light/dark toggle like every other section — it used to be forced dark to
+   match a video frame that's since been removed; forcing it kept the
+   toggle from visibly doing anything on this slide, which read as broken. */
+.hero-mkt{position:relative;min-height:100svh;display:grid;grid-template-columns:1.05fr 0.95fr;align-items:center;gap:clamp(24px,4vw,60px);text-align:left;padding:132px var(--gutter) 90px;overflow:hidden;max-width:var(--container);margin:0 auto}
+@media (max-width:980px){
+  .hero-mkt{grid-template-columns:1fr;text-align:center;padding-top:110px}
+  .hero-mkt__content{align-items:center}
+  .hero-mkt__words{justify-content:center}
+}
+
+/* Hero visual — a phone mockup showing the real wallet UI, see
+   WalletMockup.jsx. Earlier attempts (WebGL particles, a tinted stock
+   video, a floating 3D card carousel) all read as decorative rather than
+   product-designed; this shows the actual thing instead. */
+.wallet-mock-stage{position:relative;z-index:1;perspective:1400px;display:flex;align-items:center;justify-content:center;padding:20px}
+.wallet-mock-wrap{position:relative}
+.wallet-mock{width:260px;aspect-ratio:9/19;background:linear-gradient(160deg,var(--slate-800),var(--slate-950));border-radius:42px;padding:11px;box-shadow:0 44px 80px rgba(22,38,44,0.32),0 12px 30px rgba(22,38,44,0.22);position:relative;transform-style:preserve-3d}
+.wallet-mock__notch{position:absolute;top:11px;left:50%;transform:translateX(-50%);width:84px;height:20px;background:var(--slate-950);border-radius:12px;z-index:2}
+.wallet-mock__screen{position:relative;width:100%;height:100%;border-radius:32px;background:linear-gradient(165deg,var(--paper),#efe7d2);overflow:hidden;display:flex;flex-direction:column;padding:26px 16px 16px;color:var(--slate-950);box-shadow:inset 0 0 0 1px rgba(0,0,0,.06)}
+[data-theme="dark"] .wallet-mock__screen{background:linear-gradient(165deg,var(--slate-800),var(--slate-950));color:var(--paper)}
+.wallet-mock__status{display:flex;justify-content:space-between;font-size:11px;font-weight:600;opacity:.55;margin-bottom:16px;font-family:var(--font-display)}
+.wallet-mock__header{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
+.wallet-mock__brand{display:flex;align-items:center;gap:6px;font-family:var(--font-display);font-weight:700;font-size:15px}
+.wallet-mock__brand img{width:18px;height:18px}
+.wallet-mock__network{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:600;padding:5px 10px;border-radius:999px;background:rgba(22,38,44,.07)}
+[data-theme="dark"] .wallet-mock__network{background:rgba(250,247,240,.1)}
+.wallet-mock__network img{width:14px;height:14px;border-radius:50%}
+.wallet-mock__balance{display:flex;flex-direction:column;gap:4px;margin-bottom:18px}
+.wallet-mock__balance-label{font-size:10.5px;opacity:.6;text-transform:uppercase;letter-spacing:.1em}
+.wallet-mock__balance-amount{font-family:var(--font-display);font-size:28px;font-weight:700;letter-spacing:-0.02em}
+.wallet-mock__balance-change{font-size:12px;color:var(--teal);font-weight:600}
+.wallet-mock__actions{display:flex;justify-content:space-between;gap:8px;margin-bottom:20px}
+.wallet-mock__action{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;font-size:10px;font-weight:600;padding:10px 4px;border-radius:14px;background:rgba(22,38,44,.06)}
+[data-theme="dark"] .wallet-mock__action{background:rgba(250,247,240,.1)}
+.wallet-mock__action .icon{width:16px;height:16px;color:var(--gold-600)}
+.wallet-mock__tokens{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:11px}
+.wallet-mock__tokens li{display:flex;align-items:center;gap:10px;font-size:12px}
+.wallet-mock__tokens img{width:26px;height:26px;border-radius:50%}
+.wallet-mock__token-meta{display:flex;flex-direction:column;flex:1}
+.wallet-mock__token-meta small{opacity:.55;font-size:10.5px}
+.wallet-mock__token-value{font-weight:700;font-size:12px}
+.wallet-mock__toast{position:absolute;bottom:18px;left:16px;right:16px;display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:14px;background:var(--panel);box-shadow:var(--shadow-1);font-size:11.5px;font-weight:600;color:var(--ink);border:1px solid var(--line);z-index:3}
+.wallet-mock__toast .icon{width:15px;height:15px;color:var(--teal)}
+@media (max-width:980px){.wallet-mock-stage{padding:8px}.wallet-mock{width:220px}}
+
+.hero-mkt__content{position:relative;z-index:1;display:flex;flex-direction:column;align-items:flex-start;gap:22px}
+.hero-mkt__mark{height:clamp(46px,7vw,64px);width:auto;animation:heroPop .9s var(--ease-out) both}
+@keyframes heroPop{0%{opacity:0;transform:scale(.6) rotate(-12deg)}70%{transform:scale(1.06) rotate(2deg)}100%{opacity:1;transform:scale(1) rotate(0)}}
+
+.hero-mkt__words{display:flex;flex-wrap:wrap;justify-content:flex-start;gap:.35em;font-family:var(--font-display);font-weight:700;font-size:clamp(2.4rem,1.4rem + 4.5vw,4.4rem);line-height:1.02;letter-spacing:-0.02em;margin:0}
+.hero-word{display:inline-flex;animation:wordIn .8s var(--ease-out) backwards;animation-delay:calc(var(--i) * .12s + .2s)}
+@keyframes wordIn{0%{opacity:0;transform:translateY(.4em);filter:blur(6px)}100%{opacity:1;transform:translateY(0);filter:blur(0)}}
+.hero-dot{color:var(--gold);display:inline-block;animation:dotPulse 2.6s ease-in-out .6s infinite}
+.hero-dot--teal{color:var(--teal);animation-delay:1.1s}
+@keyframes dotPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.35)}}
+
+.hero-mkt__surtitle{font-size:13px;font-weight:600;letter-spacing:.22em;text-transform:uppercase;color:var(--muted);max-width:44ch;animation:fadeUp .8s var(--ease-out) .55s backwards}
+.hero-mkt__actions{animation:fadeUp .8s var(--ease-out) .68s backwards}
+.hero-mkt__note{font-size:12.5px;color:var(--muted);animation:fadeUp .8s var(--ease-out) .78s backwards}
+.hero-mkt .chain-row{animation:fadeUp .8s var(--ease-out) .88s backwards}
+@keyframes fadeUp{0%{opacity:0;transform:translateY(16px)}100%{opacity:1;transform:translateY(0)}}
+
+.hero-mkt__hint{position:absolute;bottom:34px;left:0;right:0;display:flex;justify-content:center;gap:8px;font-size:13px;color:var(--muted);letter-spacing:.04em;animation:hintbob 2.6s ease-in-out infinite,fadeUp .8s var(--ease-out) 1.1s backwards}
+@keyframes hintbob{0%,100%{transform:translateY(0);opacity:.7}50%{transform:translateY(6px);opacity:1}}
+
+/* Feature / work panels — alternate a small animated diagram left/right of
+   the copy (see PanelVisual.jsx) instead of repeating the same two-column
+   layout three times in a row. */
+.panel{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:clamp(24px,5vw,64px);align-items:center;max-width:var(--container);width:100%;margin:0 auto}
+/* minmax(0, ...) on every column, not plain fr — grid items default to
+   min-width:auto, which refuses to shrink a column below its content's own
+   min-content size. The base 2-column .panel rule above already guards
+   against this; this 3-column override didn't, so it stayed latent until
+   the network diagram's own content got wide enough to actually trigger it
+   and blow the whole row out past the viewport edge. */
+.panel--visual{grid-template-columns:minmax(0,0.85fr) minmax(0,0.95fr) minmax(0,1.05fr)}
+.panel__eyebrow-col{display:flex;flex-direction:column;gap:14px;order:1}
+.panel__visual-col{order:2;display:flex;align-items:center;justify-content:center}
+.panel__body{display:flex;flex-direction:column;gap:18px;padding-top:6px;order:3}
+.panel--reverse .panel__visual-col{order:3}
+.panel--reverse .panel__body{order:2}
+.panel__title{font-size:var(--step-3);font-weight:600;letter-spacing:-0.02em;max-width:14ch}
+.panel__desc{font-size:var(--step-0);color:var(--muted);max-width:58ch}
+.panel__link{display:inline-flex;align-items:center;gap:10px;font-weight:600;font-size:var(--step--1);text-decoration:none;color:var(--ink);width:fit-content;padding-bottom:2px;border-bottom:1px solid var(--line);transition:border-color var(--dur-fast),gap var(--dur-fast)}
+.panel__link:hover{border-color:var(--gold);gap:14px}
+.panel__arrow{transition:transform var(--dur-fast) var(--ease-out)}
+.panel__link:hover .panel__arrow{transform:translateX(3px)}
+@media (max-width:820px){
+  .panel,.panel--visual{grid-template-columns:1fr}
+  .panel__eyebrow-col,.panel__visual-col,.panel__body,.panel--reverse .panel__visual-col,.panel--reverse .panel__body{order:initial}
+}
+
+/* Panel visuals */
+.panel-visual{width:100%;aspect-ratio:1;max-width:260px;display:flex;align-items:center;justify-content:center;position:relative;margin:0 auto}
+
+/* Networks — "one seed branches into four chains" diagram, replacing logos
+   that just orbited in a circle with no real point. See PanelVisual.jsx.
+   Sized noticeably larger than a generic panel-visual, and each node now
+   carries its chain name (the icons alone weren't legible enough on their
+   own) — but .panel--visual's grid column is fr-based, so this container's
+   *actual* rendered size genuinely varies with viewport (measured 246px on
+   a narrow desktop up to the 320px cap on a wide one). Fixed-px node/label
+   sizes only avoided colliding at whatever one size they were tuned
+   against; container query units (cqw, relative to this element's own
+   inline size) scale every node and label together with the container
+   itself, so the layout holds at any size the grid actually gives it. */
+.network-map{max-width:320px;container-type:inline-size}
+.network-map__svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.network-map__path{fill:none;stroke-width:1.8;stroke-linecap:round;vector-effect:non-scaling-stroke;stroke-dasharray:5 6}
+.network-map__path--gold{stroke:var(--gold);animation:flowDash 1.6s linear infinite}
+.network-map__path--teal{stroke:var(--teal);animation:flowDash 1.6s linear infinite}
+@keyframes flowDash{to{stroke-dashoffset:-22}}
+.network-map__seed{position:absolute;transform:translate(-50%,-50%);width:22cqw;height:22cqw;border-radius:50%;background:var(--panel);box-shadow:var(--shadow-1);display:flex;align-items:center;justify-content:center;border:1px solid var(--line);z-index:1}
+.network-map__seed img{width:55%}
+.network-map__node{position:absolute;transform:translate(-50%,-50%);width:14cqw;height:14cqw;border-radius:50%;background:var(--panel);box-shadow:var(--shadow-1);display:flex;align-items:center;justify-content:center;border:1px solid var(--line)}
+.network-map__node img{width:56%;height:56%;border-radius:50%}
+.network-map__node--gold{box-shadow:var(--shadow-1),0 0 0 3px rgba(219,176,87,0.14)}
+.network-map__node--teal{box-shadow:var(--shadow-1),0 0 0 3px rgba(111,179,168,0.16)}
+/* Width, margin and font-size all in cqw too, for the same reason as the
+   node/seed sizing above — and no white-space:nowrap, so "BNB Chain" wraps
+   to two lines rather than overflowing if a container ever renders small
+   enough that even the scaled label doesn't fit on one line. */
+.network-map__label{position:absolute;top:100%;left:50%;transform:translateX(-50%);margin-top:2cqw;width:24cqw;font-size:clamp(9px,3cqw,11px);font-weight:600;color:var(--muted);text-align:center;line-height:1.25}
+@media (prefers-reduced-motion:reduce){.network-map__path{animation:none}}
+@media (max-width:820px){.network-map{max-width:280px}}
+
+.vault-visual{position:relative}
+.vault-ring{position:absolute;border-radius:50%;border:1px solid var(--gold)}
+.vault-ring--1{width:100%;height:100%}
+.vault-ring--2{width:76%;height:76%}
+.vault-core{width:92px;height:92px;border-radius:26px;background:var(--slate-950);display:flex;align-items:center;justify-content:center;box-shadow:var(--shadow-1);position:relative;z-index:1}
+.vault-core .icon{width:40px;height:40px;color:var(--gold)}
+.vault-key{position:absolute;bottom:14%;right:14%;width:44px;height:44px;border-radius:50%;background:var(--panel);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;box-shadow:var(--shadow-1);z-index:2}
+.vault-key .icon{width:20px;height:20px;color:var(--gold-600)}
+
+.browser-mock{width:100%;max-width:300px;border-radius:16px;border:1px solid var(--line);background:var(--panel);box-shadow:var(--shadow-1);overflow:hidden}
+.browser-mock__bar{display:flex;align-items:center;gap:6px;padding:10px 12px;border-bottom:1px solid var(--line);background:var(--glass)}
+.browser-mock__dot{width:8px;height:8px;border-radius:50%;background:var(--line)}
+.browser-mock__url{flex:1;margin-left:8px;height:18px;border-radius:6px;background:var(--glass);font-size:10px;display:flex;align-items:center;padding:0 8px;color:var(--muted)}
+.browser-mock__body{padding:28px 20px;display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center}
+.browser-mock__shield{width:56px;height:56px;border-radius:16px;background:var(--gold);display:flex;align-items:center;justify-content:center}
+.browser-mock__shield .icon{width:28px;height:28px;color:var(--slate-950)}
+.browser-mock__approve{padding:8px 20px;border-radius:999px;background:var(--slate-950);color:var(--paper);font-size:12px;font-weight:600}
+[data-theme="dark"] .browser-mock__approve{background:var(--gold);color:var(--slate-950)}
+
+/* CTA — .cta-panel__inner sits inside the final horizontal-scroll slide's
+   .h-scroll__stack, so it only owns its own flex layout, not outer section
+   chrome (padding/border/max-width are the slide's job now). */
+.cta-panel__inner{display:flex;flex-direction:column;align-items:center;gap:18px;text-align:center;margin-top:10px}
+.cta-panel__title{font-size:var(--step-3);font-weight:600;max-width:18ch;letter-spacing:-0.02em}
+.cta-panel__desc{color:var(--muted);max-width:52ch;font-size:var(--step-0)}
+.cta-panel__actions{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;margin-top:6px}
+.btn-lg{padding:14px 26px;border-radius:var(--radius-pill);font-size:15px;display:inline-flex;align-items:center;gap:10px}
+.btn-outline{background:transparent;border:1px solid var(--line);color:var(--ink);border-radius:var(--radius-pill)}
+.btn-outline:hover{border-color:var(--gold);color:var(--gold-600)}
+
+/* Section heading (reused above feature grid / steps). Padding is minimal —
+   inside a horizontal-scroll slide, .h-scroll__stack's gap does the spacing. */
+.section-head{max-width:var(--container);margin:0 auto;text-align:center;display:flex;flex-direction:column;align-items:center;gap:12px}
+.section-head .eyebrow{justify-content:center}
+.section-head__title{font-size:var(--step-2);font-weight:600;letter-spacing:-0.02em;max-width:22ch}
+.section-head__desc{color:var(--muted);max-width:56ch;font-size:var(--step-0)}
+
+/* Chain badge row */
+.chain-row{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
+.chain-badge{display:flex;flex-shrink:0;align-items:center;gap:8px;padding:7px 16px 7px 7px;border-radius:var(--radius-pill);background:var(--panel);border:1px solid var(--line);font-size:13px;font-weight:600;white-space:nowrap;transition:transform var(--dur-fast),border-color var(--dur-fast)}
+.chain-badge:hover{transform:translateY(-2px);border-color:var(--gold)}
+.chain-badge img{width:22px;height:22px;min-width:22px;border-radius:50%;display:block;object-fit:cover}
+
+/* Marquee */
+.marquee{display:flex;overflow:hidden;position:relative;padding:26px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);-webkit-mask-image:linear-gradient(90deg,transparent,#000 8%,#000 92%,transparent);mask-image:linear-gradient(90deg,transparent,#000 8%,#000 92%,transparent)}
+.marquee__track{display:flex;gap:56px;width:max-content;animation:marquee 26s linear infinite}
+.marquee:hover .marquee__track{animation-play-state:paused}
+.marquee__item{display:flex;align-items:center;gap:10px;white-space:nowrap;font-family:var(--font-display);font-weight:600;font-size:15px;color:var(--muted);transition:color .3s var(--ease-out),transform .3s var(--ease-out)}
+.marquee__item:hover{color:var(--ink);transform:scale(1.06)}
+.marquee__item img{height:22px;width:auto;opacity:0.92}
+.marquee__item .icon{width:18px;height:18px;color:var(--gold-600)}
+@keyframes marquee{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+@media (prefers-reduced-motion:reduce){.marquee__track{animation:none}}
+
+/* Feature showcase — replaces the old flat-color bento grid (see
+   FeatureShowcase.jsx for why: two of its six card colors broke down in
+   dark theme). Surfaces are always var(--panel)/var(--line)/var(--ink) —
+   already theme-aware — and color only ever shows up as a small accent,
+   alternating the site's two existing brand colors (gold, teal). A
+   clickable, auto-advancing list on the left; the selected feature's full
+   detail crossfades into a stage on the right. */
+.showcase{display:grid;grid-template-columns:0.85fr 1.15fr;gap:28px;width:100%;max-width:var(--container);align-items:stretch}
+.showcase__list{display:flex;flex-direction:column;gap:6px}
+.showcase__item{display:flex;align-items:center;gap:14px;padding:11px 16px;border-radius:16px;border:1px solid transparent;background:transparent;cursor:pointer;text-align:left;position:relative;overflow:hidden;font-family:var(--font-body);transition:background .3s var(--ease-out)}
+.showcase__item:hover{background:var(--glass)}
+.showcase__item--active{background:var(--panel);border-color:var(--line);box-shadow:var(--shadow-1)}
+.showcase__item-icon{width:38px;height:38px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:var(--glass);color:var(--muted);transition:background .3s var(--ease-out),color .3s var(--ease-out)}
+.showcase__item-icon .icon{width:18px;height:18px}
+.showcase__item--active.showcase__item--gold .showcase__item-icon{background:rgba(219,176,87,0.18);color:var(--gold-600)}
+.showcase__item--active.showcase__item--teal .showcase__item-icon{background:rgba(111,179,168,0.2);color:var(--teal)}
+.showcase__item-title{font-weight:600;font-size:14.5px;flex:1;color:var(--ink)}
+.showcase__item-bar{position:absolute;left:16px;right:16px;bottom:6px;height:2px;border-radius:2px;background:var(--line);overflow:hidden}
+.showcase__item-fill{display:block;height:100%;width:100%;transform-origin:left}
+.showcase__item--gold .showcase__item-fill{background:var(--gold)}
+.showcase__item--teal .showcase__item-fill{background:var(--teal)}
+
+.showcase__stage{position:relative;border-radius:28px;border:1px solid var(--line);background:var(--panel);padding:clamp(24px,4vw,40px);display:flex;align-items:center;overflow:hidden;min-height:220px}
+.showcase__stage::before{content:"";position:absolute;top:-40%;right:-15%;width:55%;height:170%;border-radius:50%;background:var(--stage-glow,var(--gold));opacity:.14;filter:blur(70px);pointer-events:none;transition:background .5s var(--ease-out)}
+.showcase__panel{position:relative;display:flex;flex-direction:column;gap:14px;width:100%}
+.showcase__panel-icon{width:60px;height:60px;border-radius:18px;display:flex;align-items:center;justify-content:center}
+.showcase__panel-icon .icon{width:28px;height:28px}
+.showcase__panel--gold .showcase__panel-icon{background:rgba(219,176,87,0.16);color:var(--gold-600)}
+.showcase__panel--teal .showcase__panel-icon{background:rgba(111,179,168,0.18);color:var(--teal)}
+.showcase__panel-title{font-size:var(--step-2);font-weight:600;letter-spacing:-0.02em;margin:0}
+.showcase__panel-desc{color:var(--muted);font-size:var(--step-0);line-height:1.6;max-width:50ch;margin:0}
+
+@media (max-width:820px){
+  .showcase{grid-template-columns:1fr;gap:16px}
+  .showcase__list{flex-direction:row;overflow-x:auto;gap:8px;padding-bottom:4px}
+  .showcase__item{flex-direction:column;gap:8px;min-width:104px;text-align:center;padding:12px 10px}
+  .showcase__item-bar{left:10px;right:10px}
+  .showcase__item-title{font-size:12px}
+  .showcase__stage{min-height:220px}
+}
+
+/* Steps ("how it works") */
+.steps{max-width:var(--container);width:100%;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.step{display:flex;flex-direction:column;gap:10px;padding:18px;border-radius:18px;background:var(--panel);border:1px solid var(--line);position:relative;transition:border-color .35s var(--ease-out),box-shadow .35s var(--ease-out)}
+.step:hover{border-color:var(--gold);box-shadow:var(--shadow-1)}
+.step__num{font-family:var(--font-display);font-size:12.5px;color:var(--gold-600);font-weight:700;letter-spacing:.1em}
+.step__icon{width:44px;height:44px;border-radius:14px;background:var(--glass);display:flex;align-items:center;justify-content:center;transition:transform .5s cubic-bezier(.34,1.56,.64,1),background .35s var(--ease-out)}
+.step:hover .step__icon{transform:scale(1.12) rotate(6deg);background:var(--gold)}
+.step:hover .step__icon .icon{color:var(--slate-950)}
+.step__icon .icon{width:22px;height:22px;color:var(--teal)}
+.step__title{font-family:var(--font-display);font-weight:700;font-size:1.05rem;margin:0}
+.step__desc{font-size:.87rem;color:var(--muted);line-height:1.5;margin:0}
+@media (max-width:900px){.steps{grid-template-columns:1fr 1fr}}
+@media (max-width:560px){.steps{grid-template-columns:1fr}}
+
+/* Trust / tech badge row */
+.badge-row{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;max-width:var(--container);margin:0 auto;padding:0 var(--gutter)}
+.badge-pill{display:inline-flex;align-items:center;gap:8px;padding:9px 16px;border-radius:var(--radius-pill);border:1px solid var(--line);font-size:13px;font-weight:600;color:var(--muted);background:var(--panel);transition:border-color var(--dur-fast),color var(--dur-fast)}
+.badge-pill:hover{border-color:var(--gold);color:var(--ink)}
+.badge-pill .icon{width:16px;height:16px;color:var(--gold-600)}
+
+/* Stats band — verifiable technical facts, not fabricated usage metrics.
+   See StatsBand.jsx. */
+.stats-band{display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center;width:100%;max-width:var(--container);margin:0 auto}
+.stats-band__title{font-size:var(--step-2);font-weight:600;letter-spacing:-0.02em;max-width:26ch;margin:0}
+.stats-band__grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;width:100%;margin-top:18px}
+.stats-band__tile{display:flex;flex-direction:column;align-items:center;gap:8px;padding:28px 18px;border-radius:22px;background:var(--panel);border:1px solid var(--line)}
+.stats-band__icon{width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:var(--glass);margin-bottom:4px}
+.stats-band__icon .icon{width:20px;height:20px;color:var(--gold-600)}
+.stats-band__value{font-family:var(--font-display);font-size:clamp(1.8rem,1.4rem + 1.4vw,2.6rem);font-weight:700;letter-spacing:-0.02em}
+.stats-band__label{font-size:14px;font-weight:600}
+.stats-band__hint{font-size:12px;color:var(--muted);max-width:22ch}
+@media (max-width:820px){.stats-band__grid{grid-template-columns:1fr 1fr}}
+@media (max-width:520px){.stats-band__grid{grid-template-columns:1fr}}
+
+/* FAQ accordion. See Faq.jsx. */
+.faq{display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;width:100%;max-width:44rem;margin:0 auto}
+.faq__title{font-size:var(--step-2);font-weight:600;letter-spacing:-0.02em;margin:0}
+.faq__list{width:100%;margin-top:18px;display:flex;flex-direction:column;gap:10px;text-align:left}
+.faq__item{border:1px solid var(--line);border-radius:16px;background:var(--panel);overflow:hidden}
+.faq__question{width:100%;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 20px;background:none;border:none;cursor:pointer;font-family:var(--font-display);font-weight:600;font-size:15px;color:var(--ink);text-align:left}
+.faq__toggle{flex-shrink:0;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;color:var(--gold-600);background:var(--glass);transition:transform var(--dur-fast)}
+.faq__item--open .faq__toggle{transform:rotate(180deg)}
+.faq__answer-wrap{overflow:hidden}
+.faq__answer{margin:0;padding:0 20px 18px;color:var(--muted);font-size:13.5px;line-height:1.6}
+
+/* Rich marketing footer */
+.mkt-footer{border-top:1px solid var(--line);padding:64px var(--gutter) 28px;background:var(--bg)}
+.mkt-footer__top{display:grid;grid-template-columns:1.3fr repeat(3,1fr);gap:32px;max-width:var(--container);margin:0 auto;padding-bottom:40px}
+.mkt-footer__brand{display:flex;flex-direction:column;gap:14px}
+.mkt-footer__brand-mark{display:flex;align-items:center;gap:10px}
+.mkt-footer__brand-mark img{height:28px}
+.mkt-footer__brand-mark span{font-family:var(--font-display);font-weight:700;font-size:17px}
+.mkt-footer__tag{color:var(--muted);font-size:13.5px;max-width:32ch;line-height:1.65;margin:0}
+.mkt-footer__col h4{font-size:12px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin:0 0 14px;font-weight:600}
+.mkt-footer__col a{display:block;color:var(--ink);text-decoration:none;font-size:14px;padding:6px 0;opacity:.82;transition:opacity var(--dur-fast),color var(--dur-fast)}
+.mkt-footer__col a:hover{opacity:1;color:var(--gold-600)}
+.mkt-footer__bottom{max-width:var(--container);margin:0 auto;padding-top:24px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;color:var(--muted);font-size:13px}
+.mkt-footer__socials{display:flex;gap:10px}
+.mkt-footer__socials a{display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;border:1px solid var(--line);color:var(--ink);transition:border-color var(--dur-fast),color var(--dur-fast),transform var(--dur-fast)}
+.mkt-footer__socials a:hover{border-color:var(--gold);color:var(--gold-600);transform:translateY(-2px)}
+.mkt-footer__socials .icon{width:16px;height:16px}
+@media (max-width:820px){.mkt-footer__top{grid-template-columns:1fr 1fr}}
+@media (max-width:560px){.mkt-footer__top{grid-template-columns:1fr}}
+
+/* Reveal stagger helpers */
+@keyframes spin-slow{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+.spin-slow{animation:spin-slow 12s linear infinite}
+
+/* ============================================================
+   Prompt 0197 fase 1 — Background OFF ("solid" mode).
+   data-surface on <html> is set by hooks/useSurface.js (+ index.html's
+   pre-paint script), same pattern as data-theme. 'glass' (the default,
+   Background ON) matches NOTHING below — glass mode's own rules above and
+   in admin.css are deliberately untouched, so that look stays exactly as
+   verified through prompts 0188-0196. Everything here is scoped under
+   [data-surface="solid"] only.
+
+   Light solid: flat --paper cream page; cards/sidebar/topbar one step
+   LIGHTER cream (#fffdf7) so panels still read against the page.
+   Dark solid: near-black page #121212 (the gray-black end of the owner's
+   #0d0d0d..#121212 range — chosen so panels at #1e1e1e keep real dark
+   headroom below the page color for fase 2's inset shadows; values
+   measured/reported in that prompt's report) — deliberately NOT #000000.
+
+   Mechanism: the glass @supports block (end of admin.css) paints the 7
+   panel classes with --glass-panel-bg + blur. Here --glass-panel-bg is
+   re-pointed at the solid --panel color and backdrop-filter is switched
+   off explicitly ([data-surface="solid"] .card etc. is attribute+class =
+   higher specificity than that block's single-class selectors, so these
+   win regardless of file order). Modals, dropdown/emoji-picker popovers,
+   and the error-boundary card all render through .card, so they follow
+   automatically; native inputs/selects use --bg and follow the token. */
+[data-surface="solid"]{
+  /* Fase 2 (owner adjustment): light solid moved from the fase-1 flat
+     --paper cream to the reference image's warm brownish cream — page
+     #eae2d1 (middle of the owner's #ece5d5..#e9e1d0 range), panels one
+     step LIGHTER (#f4efe4, the owner's own figure), fields (inputs/
+     editor) one step DARKER than the page (#e0d7c2) so inset reads as a
+     true recess. Contrast re-measured in the fase-2 report. */
+  --bg:#eae2d1;
+  --panel:#f4efe4;
+  --glass-panel-bg:var(--panel);
+  --field-bg:#e0d7c2;
+  /* Neumorphic shadow pair (fase 2) — MUST read clearly, per the owner:
+     a warm dark shadow to the bottom-right and a light glint to the
+     top-left. Offsets 6px (hover 8px), blur 12px (hover 16px) — inside
+     the owner's 5-8px/10-16px window, never below 4px. The same pair
+     with `inset` makes the recessed look; -sm/-xs are the same recipe
+     scaled down for small controls (nav rows, tab, switch track). */
+  --nm-dark:rgba(146,126,94,0.55);
+  --nm-light:rgba(255,255,255,0.92);
+  --nm-raised:6px 6px 12px var(--nm-dark),-6px -6px 12px var(--nm-light);
+  --nm-raised-lg:8px 8px 16px var(--nm-dark),-8px -8px 16px var(--nm-light);
+  --nm-inset:inset 5px 5px 10px var(--nm-dark),inset -5px -5px 10px var(--nm-light);
+  --nm-inset-sm:inset 4px 4px 8px var(--nm-dark),inset -4px -4px 8px var(--nm-light);
+  --nm-inset-xs:inset 2px 2px 4px var(--nm-dark),inset -2px -2px 4px var(--nm-light);
+}
+[data-surface="solid"][data-theme="dark"]{
+  --bg:#121212;
+  --panel:#1e1e1e;
+  --glass-panel-bg:var(--panel);
+  /* Fields keep the page color — already one step darker than the
+     #1e1e1e panels they sit on. */
+  --field-bg:var(--bg);
+  /* Dark solid: shadow genuinely blacker than the #121212 page, glint a
+     thin transparent white — strong enough to survive a crop check, per
+     the owner's "kalau tidak kelihatan, naikkan, jangan diterima datar". */
+  --nm-dark:rgba(0,0,0,0.8);
+  --nm-light:rgba(255,255,255,0.07);
+}
+/* Placed after the two [data-theme] body image rules above so equal
+   specificity resolves by order: solid mode always drops the photo. */
+[data-surface="solid"] body{background-image:none}
+[data-surface="solid"] .card,
+[data-surface="solid"] .stat-tile,
+[data-surface="solid"] .table-wrap,
+[data-surface="solid"] .login-card,
+[data-surface="solid"] .sidebar,
+[data-surface="solid"] .page-head,
+[data-surface="solid"] .topbar{
+  backdrop-filter:none;
+  -webkit-backdrop-filter:none;
+}
+/* The topbar's glass fallback color was --bg (see admin.css's @supports
+   comment); in solid mode keep it on the page color too, so the sticky
+   header reads as part of the page rather than a floating cream/gray bar. */
+[data-surface="solid"] .topbar{background:var(--bg)}
+
+/* ---- Fase 2: raised / inset (solid mode ONLY — glass untouched) ---- */
+/* RAISED, low level: the big panels. (.table-wrap is deliberately NOT
+   here — the table area is an inset surface, below.) */
+[data-surface="solid"] .card,
+[data-surface="solid"] .stat-tile,
+[data-surface="solid"] .login-card,
+[data-surface="solid"] .sidebar,
+[data-surface="solid"] .page-head{box-shadow:var(--nm-raised)}
+/* RAISED controls: buttons (incl. the Background switch's outer button),
+   resting more on hover, pressed = inset. */
+[data-surface="solid"] .btn,
+[data-surface="solid"] .icon-btn{box-shadow:var(--nm-raised)}
+[data-surface="solid"] .btn:hover,
+[data-surface="solid"] .icon-btn:hover{box-shadow:var(--nm-raised-lg)}
+[data-surface="solid"] .btn:active,
+[data-surface="solid"] .icon-btn:active{box-shadow:var(--nm-inset-sm);transform:none}
+/* .btn-primary's glass-mode hover glow (--shadow-gold) is replaced by the
+   same raised-hover pair so the language stays consistent in solid mode. */
+[data-surface="solid"] .btn-primary:hover{box-shadow:var(--nm-raised-lg)}
+[data-surface="solid"] .btn-primary:active{box-shadow:var(--nm-inset-sm)}
+/* Broadcast tab strip: the ACTIVE tab (a .btn-primary NavLink inside
+   .toolbar__filters, see BroadcastTabs.jsx) sits pressed-in, not raised. */
+[data-surface="solid"] .toolbar__filters .btn-primary{box-shadow:var(--nm-inset-sm);transform:none}
+/* Sidebar nav (owner spec): raised at rest on the sidebar's own surface,
+   more raised on hover, INSET when active (current route) or pressed. */
+[data-surface="solid"] .sidebar .nav-item{background:var(--panel);box-shadow:var(--nm-raised)}
+[data-surface="solid"] .sidebar .nav-item:hover{background:var(--panel);box-shadow:var(--nm-raised-lg)}
+[data-surface="solid"] .sidebar .nav-item:active,
+[data-surface="solid"] .sidebar .nav-item.nav-item--active{background:var(--glass);box-shadow:var(--nm-inset-sm)}
+[data-surface="solid"] .nav-item--disabled{box-shadow:none}
+/* Bot switcher tiles: inactive raised, ACTIVE pressed-in (owner spec). */
+[data-surface="solid"] .bot-switcher__item{background:var(--panel);box-shadow:var(--nm-raised)}
+[data-surface="solid"] .bot-switcher__item:hover{box-shadow:var(--nm-raised-lg)}
+[data-surface="solid"] .bot-switcher__item--active{background:var(--glass);box-shadow:var(--nm-inset-sm)}
+/* INSET surfaces: fields, the rich text editor box, the emoji search box,
+   the table area, and the switch track. Fields also drop to --field-bg
+   (darker than the page in light; the page color itself in dark). The
+   existing gold focus treatment (border-color/:focus-within) is untouched
+   and stays visible on top of the inset shadow. */
+[data-surface="solid"] .field input,
+[data-surface="solid"] .field select,
+[data-surface="solid"] .field textarea,
+[data-surface="solid"] .data-table select{background-color:var(--field-bg);box-shadow:var(--nm-inset)}
+[data-surface="solid"] .rich-text-editor{background:var(--field-bg);box-shadow:var(--nm-inset)}
+[data-surface="solid"] .premium-emoji-picker__search{background:var(--field-bg);box-shadow:var(--nm-inset-sm)}
+[data-surface="solid"] .table-wrap{box-shadow:var(--nm-inset)}
+[data-surface="solid"] .bg-toggle__track{box-shadow:var(--nm-inset-xs)}
+[data-surface="solid"] .bg-toggle__knob{box-shadow:2px 2px 4px var(--nm-dark),-1px -1px 2px var(--nm-light)}
+/* Focus ring: always visible, --gold, same accent the editor's own
+   focus already uses. */
+[data-surface="solid"] .btn:focus-visible,
+[data-surface="solid"] .icon-btn:focus-visible,
+[data-surface="solid"] .nav-item:focus-visible,
+[data-surface="solid"] .bot-switcher__item:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+/* Disabled: contrast down, shadow removed (reference image's own rule). */
+[data-surface="solid"] .btn:disabled,
+[data-surface="solid"] .btn[disabled],
+[data-surface="solid"] .icon-btn:disabled{opacity:.5;box-shadow:none;transform:none;cursor:default}

@@ -1,0 +1,27 @@
+{
+  "name": "fluxio-extension",
+  "version": "0.2.6",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "description": "Fluxio Wallet browser extension (Manifest V3). Unpacked/no-build for content-script and provider files; only the background service worker is bundled (it's the only surface that needs the wallet crypto libraries).",
+  "scripts": {
+    "build": "node build.mjs",
+    "build:release": "node build.mjs --release",
+    "package": "node scripts/package-release.mjs",
+    "watch": "node build.mjs --watch",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@fluxio/constants": "workspace:*",
+    "@fluxio/crypto": "workspace:*",
+    "@fluxio/services": "workspace:*",
+    "@fluxio/utils": "workspace:*",
+    "buffer": "6.0.3"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2",
+    "vitest": "3.2.4"
+  }
+}

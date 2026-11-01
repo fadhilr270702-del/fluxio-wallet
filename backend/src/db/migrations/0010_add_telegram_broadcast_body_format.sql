@@ -1,0 +1,15 @@
+-- Marks whether telegram_broadcasts.body is raw plain text (the only kind
+-- that has ever existed until now) or pre-sanitized Telegram-safe HTML (the
+-- new WYSIWYG composer). This is what lets old and new broadcasts share one
+-- column safely: 'plain' rows are sent exactly as before (no parse_mode,
+-- no escaping); 'html' rows are sent with parse_mode:'HTML' and body used
+-- as-is (already validated/sanitized at write time — see
+-- backend/src/telegram/formatting.js and adminTelegramBroadcastRoutes.js).
+-- Every pre-existing row backfills to 'plain' via the DEFAULT below, so
+-- nothing about how they're sent changes.
+--
+-- Plain ADD COLUMN with a DEFAULT + CHECK on the new column only (not
+-- widening an existing constraint), so this runs through the default
+-- wrapped BEGIN/COMMIT path — no -- fluxio:manual-transaction marker
+-- needed, same as migration 0009's `buttons` column.
+ALTER TABLE telegram_broadcasts ADD COLUMN body_format TEXT NOT NULL DEFAULT 'plain' CHECK (body_format IN ('plain', 'html'));

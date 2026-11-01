@@ -1,0 +1,551 @@
+/**
+ * Shared design tokens + primitives for every extension page (popup,
+ * onboarding, settings, approval). Presentation only — no page's DOM
+ * structure or class *behavior* changes because of this file, only how
+ * the classes each page already used (button.primary/.secondary/.link,
+ * input[type=password|text], textarea, .error, .desc, .loading,
+ * .address-label/.address-box, .badge-test/.badge-local) look. Loaded via
+ * a plain <link rel="stylesheet">, same "no bundler, no build step" rule
+ * as every other file under apps/extension/ except background.js — see
+ * CLAUDE.md.
+ *
+ * Popup-only pieces (account card, action buttons, network list, chain
+ * logos, chips) live in popup/popup.css instead, since only popup.html
+ * uses them.
+ */
+
+:root {
+  /* Backgrounds */
+  --flx-bg: #0A0E1A;              /* page background (approval, popup fallback) */
+  /* Prompt 0120: pure black (#000000) per explicit user request, replacing
+     0097's deep-teal/emerald gradient — see this file's own note in
+     CLAUDE.md-adjacent prompt archive (0120) for why these two names
+     ("...green...") are kept unchanged even though the zone is no longer
+     green: renaming was out of this presentation-only change's scope.
+     Both stops set to the identical value so .zone-top's own
+     linear-gradient() call renders as a flat solid fill with zero visual
+     difference from a plain `background: #000000` — deliberately left as
+     a (degenerate) two-stop gradient rather than simplifying .zone-top's
+     own rule, so a future revision can reintroduce a subtle gradient by
+     touching only these two values again. */
+  --flx-zone-green-from: #000000; /* popup's top "account" zone — pure black (prompt 0120; was deep teal/emerald, see mockup) */
+  --flx-zone-green-to: #000000;
+  --flx-panel: #101214;           /* near-black bottom sheet / card surface */
+  --flx-card: #14171C;            /* account card + row surfaces sitting on --flx-panel */
+  --flx-surface: #12172A;         /* onboarding/settings centered-card background (unchanged from before) */
+  --flx-surface-2: #161B29;       /* inputs, chips, seed words (unchanged from before) */
+  --flx-border: #2A3142;
+
+  /* Text */
+  --flx-text: #EDEFF7;
+  --flx-text-muted: #9AA3B2;
+  --flx-text-faint: #6B7280;
+
+  /* Accent + status (unchanged hex values from before this redesign — same brand teal, now tokenized) */
+  --flx-accent: #00D9C0;
+  --flx-accent-ink: #14100A;      /* text/icon color on top of --flx-accent */
+  --flx-danger: #FF6B6B;
+  --flx-warn: #FFB84C;            /* TEST badge */
+  --flx-info: #4C9AFF;            /* LOCAL badge */
+
+  /* Shape */
+  --flx-radius-xl: 28px;          /* bottom-sheet top corners */
+  --flx-radius-lg: 16px;          /* cards */
+  --flx-radius-md: 10px;          /* buttons, rows */
+  --flx-radius-sm: 8px;           /* inputs, chips, badges */
+
+  --flx-transition: 0.15s ease;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/**
+ * Scrollbar visuals hidden, everywhere, across every page this stylesheet
+ * loads on (popup, onboarding, settings, approval — see this file's own
+ * header comment) — prompt 0120's Revision 1. SCROLL FUNCTIONALITY IS
+ * UNCHANGED: `display: none`/`scrollbar-width: none` only affect the
+ * scrollbar's own rendering, never wheel/drag/keyboard scrolling, which
+ * keep working exactly as before on every element this touches.
+ *
+ * Deliberately a universal `*` rule, not a per-container one, decided
+ * only after actually finding every scroll owner first (per this
+ * feature's own instruction not to guess): apps/extension/popup/popup.css
+ * has exactly two elements with their own dedicated `overflow-y: auto`
+ * container (`.zone-bottom__scroll`, the main screen's asset list, and
+ * `.drawer`, the account switcher) — every OTHER long screen this
+ * extension has (network picker, Swap's asset picker, Manage Tokens,
+ * Activity, in-popup Settings, ...) has no scroll container of its own
+ * at all; when their content outgrows the popup's own rendered viewport,
+ * it's the plain DOCUMENT (`html`/`body`) that scrolls, the same as any
+ * ordinary overflowing web page. A universal rule is what actually
+ * covers all of these consistently in one place, including any future
+ * screen that grows a scrollbar later, without hunting down and
+ * duplicating this pair of declarations onto every container
+ * individually — chosen for that reason, not as a shortcut past the
+ * investigation step.
+ *
+ * Chromium-only, deliberately — this is a Manifest V3 extension page,
+ * never rendered by any other engine, so no cross-browser fallback
+ * (e.g. IE's old `-ms-overflow-style`) was added. `scrollbar-width: none`
+ * is the standard (Firefox-originated, now broadly supported) property;
+ * included per this feature's own instruction for completeness even
+ * though `::-webkit-scrollbar` alone is sufficient here.
+ */
+*::-webkit-scrollbar {
+  display: none;
+}
+
+* {
+  scrollbar-width: none;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: var(--flx-bg);
+  color: var(--flx-text);
+}
+
+h1 {
+  font-size: 1.1rem;
+  margin: 0 0 12px;
+  font-weight: 600;
+}
+
+p.desc {
+  color: var(--flx-text-muted);
+  font-size: 0.82rem;
+  margin: 0 0 14px;
+  line-height: 1.4;
+}
+
+/* ---- Buttons ---- */
+
+button {
+  font-family: inherit;
+}
+
+button.primary,
+button.secondary,
+button.link,
+button.danger {
+  width: 100%;
+  padding: 10px 14px;
+  font-size: 0.95rem;
+  border: none;
+  border-radius: var(--flx-radius-md);
+  cursor: pointer;
+  margin-bottom: 8px;
+  transition: background-color var(--flx-transition), border-color var(--flx-transition), opacity var(--flx-transition), transform var(--flx-transition);
+}
+
+button.primary {
+  background: var(--flx-accent);
+  color: var(--flx-accent-ink);
+  font-weight: 600;
+}
+
+button.primary:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+
+button.secondary {
+  background: var(--flx-surface-2);
+  color: var(--flx-text);
+  border: 1px solid var(--flx-border);
+}
+
+button.secondary:hover:not(:disabled) {
+  border-color: var(--flx-accent);
+}
+
+button.link {
+  width: auto;
+  background: transparent;
+  border: none;
+  color: var(--flx-accent);
+  cursor: pointer;
+  font-size: 0.76rem;
+  padding: 0;
+  margin-bottom: 0;
+  text-decoration: underline;
+}
+
+/* Destructive-action button (prompt 0124's "Reset wallet" — this
+   codebase's first genuinely destructive, non-reversible-by-this-app
+   action, so it gets its own solid-fill color rather than reusing
+   .link/.token-manage-row__remove--confirm's text-only red). White text
+   for contrast against --flx-danger's mid-brightness coral, matching how
+   .primary pairs a bright fill with a legible ink color rather than
+   reusing .primary's own dark --flx-accent-ink (tuned for the teal, not
+   this red). */
+button.danger {
+  background: var(--flx-danger);
+  color: #FFFFFF;
+  font-weight: 600;
+}
+
+button.danger:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+  filter: none;
+}
+
+button:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  button:active:not(:disabled) {
+    transform: none;
+  }
+}
+
+/* ---- Inputs ---- */
+
+input[type='password'],
+input[type='text'],
+textarea {
+  width: 100%;
+  padding: 9px 10px;
+  border-radius: var(--flx-radius-sm);
+  border: 1px solid var(--flx-border);
+  background: var(--flx-surface-2);
+  color: var(--flx-text);
+  font-size: 0.88rem;
+  font-family: inherit;
+  margin-bottom: 8px;
+  transition: border-color var(--flx-transition);
+}
+
+textarea {
+  min-height: 90px;
+  resize: vertical;
+  font-family: 'Courier New', monospace;
+}
+
+input[type='password']:focus,
+input[type='text']:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--flx-accent);
+}
+
+/* ---- Shared text/status primitives ---- */
+
+.error {
+  color: var(--flx-danger);
+  font-size: 0.78rem;
+  margin: -2px 0 8px;
+  min-height: 1em;
+}
+
+.loading {
+  color: var(--flx-text-muted);
+  font-size: 0.88rem;
+  animation: flx-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes flx-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loading { animation: none; }
+}
+
+.address-label {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--flx-text-muted);
+  margin-bottom: 3px;
+}
+
+.address-box {
+  background: var(--flx-surface-2);
+  border: 1px solid var(--flx-border);
+  border-radius: var(--flx-radius-sm);
+  padding: 7px 9px;
+  font-family: 'Courier New', monospace;
+  font-size: 0.72rem;
+  word-break: break-all;
+  user-select: all;
+  margin-bottom: 8px;
+}
+
+.back-link {
+  margin-top: 14px;
+  text-align: center;
+}
+
+/* ---- Reveal Secret Phrase (shared/revealSeed.js) — used by both
+   settings/settings.html and the popup's in-popup Settings screen. ---- */
+
+.warning {
+  background: rgba(255, 107, 107, 0.12);
+  border: 1px solid rgba(255, 107, 107, 0.4);
+  color: var(--flx-danger);
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  margin-bottom: 16px;
+}
+
+/* revealSeed.js only ever put a plain sentence in here; prompt 0124's
+   reset-wallet screen is the first caller that needs a scannable list of
+   facts instead — scoped so a bare .warning sentence elsewhere is
+   unaffected. */
+.warning ul {
+  margin: 0;
+  padding-left: 1.1em;
+}
+
+.warning li {
+  margin-bottom: 6px;
+}
+
+.warning li:last-child {
+  margin-bottom: 0;
+}
+
+.seed-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.seed-word {
+  background: var(--flx-surface-2);
+  border: 1px solid var(--flx-border);
+  border-radius: var(--flx-radius-sm);
+  padding: 8px 10px;
+  font-size: 0.85rem;
+  font-family: 'Courier New', monospace;
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+}
+
+.seed-word .idx {
+  color: var(--flx-text-faint);
+  font-size: 0.72rem;
+  min-width: 16px;
+}
+
+/* ---- Settings list (settings/settings.js and popup/popup.js's in-popup
+   Settings screen) ---- */
+
+.settings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.settings-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--flx-surface-2);
+  border: 1px solid var(--flx-border);
+  border-radius: var(--flx-radius-md);
+  padding: 14px 16px;
+  color: var(--flx-text);
+  font-size: 0.92rem;
+  cursor: pointer;
+  text-align: left;
+}
+
+.settings-item:hover {
+  border-color: var(--flx-accent);
+}
+
+.settings-item .chevron {
+  color: var(--flx-text-faint);
+}
+
+.settings-item--toggle {
+  cursor: default;
+}
+
+.settings-item--toggle:hover {
+  border-color: var(--flx-border);
+}
+
+.settings-item__label {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.settings-item__hint {
+  color: var(--flx-text-muted);
+  font-size: 0.76rem;
+  font-weight: 400;
+}
+
+/* Auto-lock's duration picker (prompt 0117) — the first <select> anywhere
+   in this extension, styled to match the existing input/toggle language
+   (surface-2 fill, --flx-border, accent-on-focus) rather than the raw
+   browser default. Sits inline in a .settings-item--toggle row exactly
+   like the Developer-networks toggle does, so both read as the same kind
+   of "instant, no-navigation" control. */
+.settings-select {
+  flex: none;
+  background: var(--flx-surface-2);
+  border: 1px solid var(--flx-border);
+  border-radius: var(--flx-radius-sm);
+  padding: 6px 8px;
+  color: var(--flx-text);
+  font-family: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.settings-select:focus {
+  outline: none;
+  border-color: var(--flx-accent);
+}
+
+.toggle-switch {
+  position: relative;
+  width: 40px;
+  height: 22px;
+  flex: none;
+}
+
+.toggle-switch input {
+  position: absolute;
+  opacity: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  cursor: pointer;
+}
+
+.toggle-switch .track {
+  position: absolute;
+  inset: 0;
+  background: var(--flx-border);
+  border-radius: 999px;
+  transition: background var(--flx-transition);
+  pointer-events: none;
+}
+
+.toggle-switch .thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  background: var(--flx-text);
+  border-radius: 50%;
+  transition: transform var(--flx-transition);
+}
+
+.toggle-switch input:checked ~ .track {
+  background: var(--flx-accent);
+}
+
+.toggle-switch input:checked ~ .track .thumb {
+  transform: translateX(18px);
+}
+
+.badge-test,
+.badge-local {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  border-radius: 4px;
+  padding: 1px 5px;
+  line-height: 1.4;
+}
+
+.badge-test {
+  background: rgba(255, 184, 76, 0.14);
+  border: 1px solid rgba(255, 184, 76, 0.4);
+  color: var(--flx-warn);
+}
+
+.badge-local {
+  background: rgba(76, 154, 255, 0.14);
+  border: 1px solid rgba(76, 154, 255, 0.4);
+  color: var(--flx-info);
+}
+
+/* Marks an Activity entry as a token send/receive, distinct from a
+   native-coin one (prompt 0113) — same small-pill treatment as
+   .badge-test/.badge-local above, in --flx-accent (this palette's teal
+   accent) so it reads as its own third category rather than reusing
+   either existing badge's warn/info color, which already mean "TEST
+   network"/"LOCAL network" here. */
+.badge-token {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  border-radius: 4px;
+  padding: 1px 5px;
+  line-height: 1.4;
+  background: rgba(0, 217, 192, 0.14);
+  border: 1px solid rgba(0, 217, 192, 0.4);
+  color: var(--flx-accent);
+}
+
+/* ---- Skeleton loading shimmer (network/balance rows — see popup.css) ---- */
+
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--flx-surface-2);
+  border-radius: 6px;
+  color: transparent !important;
+}
+
+.skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.08), transparent);
+  animation: flx-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes flx-shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton::after { animation: none; }
+}
+
+/* ---- Focus visibility (keyboard) ---- */
+
+:focus-visible {
+  outline: 2px solid var(--flx-accent);
+  outline-offset: 2px;
+}
+
+/* ---- Scrollbar (WebKit — Chrome is the only target here) ---- */
+
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--flx-border);
+  border-radius: 4px;
+}

@@ -1,0 +1,43 @@
+{
+  "name": "@fluxio/services",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "description": "Wallet business services: vault session management, approval queue, native-coin/SPL/ERC-20 balances, Solana/EVM transaction sending, (Solana chain + local-record) transaction history, Solana token swaps via Jupiter (quotes real, execution disabled — see swapService.js), and fiat prices via CoinGecko (see priceService.js).",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./walletService": "./walletService.js",
+    "./approvalService": "./approvalService.js",
+    "./networkService": "./networkService.js",
+    "./balanceService": "./balanceService.js",
+    "./tokenService": "./tokenService.js",
+    "./transactionService": "./transactionService.js",
+    "./evmTransactionService": "./evmTransactionService.js",
+    "./historyService": "./historyService.js",
+    "./accountsService": "./accountsService.js",
+    "./swapService": "./swapService.js",
+    "./evmSwapService": "./evmSwapService.js",
+    "./swapResultParser": "./swapResultParser.js",
+    "./priceService": "./priceService.js"
+  },
+  "dependencies": {
+    "@fluxio/constants": "workspace:*",
+    "@fluxio/crypto": "workspace:*",
+    "@fluxio/utils": "workspace:*",
+    "@solana/web3.js": "1.98.4",
+    "ethers": "6.17.0"
+  },
+  "devDependencies": {
+    "@solana/spl-token": "0.4.15",
+    "bs58": "6.0.0",
+    "solc": "0.8.26",
+    "tweetnacl": "1.0.3",
+    "vitest": "3.2.4"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  }
+}

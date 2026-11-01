@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fluxio - Approve request</title>
+  <link rel="stylesheet" href="../shared/theme.css">
+  <style>
+    /* Page-specific: input[type=password]/.error come from ../shared/theme.css. */
+    .approval { padding: 20px; box-sizing: border-box; }
+    .origin { font-size: 0.85rem; color: var(--flx-text-muted); word-break: break-all; margin-bottom: 16px; }
+    .field { margin-bottom: 10px; }
+    .field .label { font-size: 0.75rem; color: var(--flx-text-muted); text-transform: uppercase; letter-spacing: .04em; }
+    .field .value { font-size: 0.9rem; word-break: break-all; }
+    .actions { display: flex; gap: 10px; margin-top: 16px; }
+    .actions button {
+      flex: 1; padding: 10px 14px; font-size: 0.9rem; border: none; border-radius: var(--flx-radius-md);
+      cursor: pointer; font-family: inherit; transition: filter var(--flx-transition), border-color var(--flx-transition);
+    }
+    .approve { background: var(--flx-accent); color: var(--flx-accent-ink); }
+    .approve:hover:not(:disabled) { filter: brightness(1.06); }
+    .reject { background: var(--flx-surface-2); color: var(--flx-text); border: 1px solid var(--flx-border) !important; }
+    .reject:hover { border-color: var(--flx-accent) !important; }
+    .actions button:disabled { opacity: 0.5; cursor: default; }
+    .hint { font-size: 0.8rem; color: var(--flx-text-muted); }
+  </style>
+</head>
+<body>
+  <div class="approval" id="app">
+    <h1>Loading request...</h1>
+  </div>
+  <script src="approval.js" type="module"></script>
+</body>
+</html>

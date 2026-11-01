@@ -1,0 +1,14 @@
+-- Prompt 0163 — same rich-text format column as migration 0021 adds to
+-- announcements, for app_versions.update_message: 'plain' (raw text, every
+-- row created before this slice) or 'html' (sanitized rich text restricted
+-- to <b><i><u><s><a href="https://...">, no <tg-emoji> — see
+-- backend/src/utils/richHtml.js's sanitizeRichHtml()). Every pre-existing
+-- row (and every platform that's never been configured at all, which
+-- listAllPlatforms() synthesizes a null-valued placeholder for rather than
+-- a real row — see appVersionsRepo.js) backfills to 'plain' via the DEFAULT
+-- below, so nothing about how an existing update_message displays changes.
+--
+-- Plain ADD COLUMN with a DEFAULT + CHECK on the new column only, so this
+-- runs through the default wrapped BEGIN/COMMIT path — no
+-- -- fluxio:manual-transaction marker needed, same as migration 0021.
+ALTER TABLE app_versions ADD COLUMN update_message_format TEXT NOT NULL DEFAULT 'plain' CHECK (update_message_format IN ('plain', 'html'));

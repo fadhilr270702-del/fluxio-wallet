@@ -1,0 +1,29 @@
+.dashboard-summary {
+  display: grid;
+  gap: 24px;
+}
+
+.wallet-card {
+  max-width: 720px;
+}
+
+.dashboard-details {
+  display: grid;
+  gap: 20px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (max-width: 760px) {
+  .dashboard-details {
+    grid-template-columns: 1fr;
+  }
+}
+
+.dashboard-panel h3 {
+  margin-bottom: 16px;
+}
+
+#walletBalance {
+  font-size: 2rem;
+  margin-top: 12px;
+}

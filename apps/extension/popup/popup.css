@@ -1,0 +1,1747 @@
+/**
+ * Popup-only styles (account card, action row, network list, chain
+ * logos/chips, Send/Receive flow specifics). Shared tokens/primitives
+ * (buttons, inputs, .error/.desc/.loading, .address-box, badges) live in
+ * ../shared/theme.css — this file only holds what's unique to
+ * popup.html/popup.js.
+ */
+
+:root {
+  /* Assets/token-list vertical rhythm — a small doubling scale so the
+     group/row/line spacing hierarchy in the network-list/token-list
+     section below reads as one deliberate rhythm instead of scattered
+     one-off pixel values. Scoped here (not ../shared/theme.css) because
+     nothing outside this network/token list uses it — see this file's
+     own header comment on the shared-vs-popup-only split.
+       --flx-space-line:  within one row's own stacked lines (e.g. a
+                          token's symbol + its secondary address line).
+       --flx-space-row:   between sibling rows within one group (native
+                          row to its first token row; token row to the
+                          next token row in the same network).
+       --flx-space-group: between one network's whole group (its native
+                          row + every token row under it) and the next
+                          network's group — deliberately larger than
+                          --flx-space-row so the grouping still reads
+                          clearly even though every row now has the same
+                          comfortable --flx-space-row rhythm regardless
+                          of whether it's a one-line or two-line row. */
+  --flx-space-line: 2px;
+  --flx-space-row: 8px;
+  --flx-space-group: 16px;
+}
+
+body {
+  background: var(--flx-panel);
+}
+
+.popup {
+  width: 375px;
+  overflow: hidden; /* clips the account card's ornament + the bottom sheet's curved corners */
+}
+
+/* Simple, non-wallet-ready screens (unlock, no-wallet, Send form/confirm/
+   result, Receive) reuse this single padded wrapper — same flat layout
+   every screen already used before this redesign, just re-tokenized. */
+.screen {
+  padding: 20px;
+}
+
+/* Unscoped (was ".screen .back-btn") so the exact same component works
+   outside a .screen too — the account drawer's Close button reuses it
+   verbatim, see popup.js's openAccountDrawer(). */
+.back-row {
+  margin-bottom: 10px;
+}
+
+.back-btn {
+  width: auto;
+  background: transparent;
+  border: none;
+  color: var(--flx-text-muted);
+  cursor: pointer;
+  padding: 4px 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.82rem;
+}
+
+.back-btn:hover {
+  color: var(--flx-text);
+}
+
+/* Full-height, vertically-centered composition (unlock, no-wallet) —
+   Phantom-style: brand mark up top, everything else centered under it,
+   instead of content stacked flush against the popup's top edge. */
+.screen--center {
+  min-height: 480px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.brand-logo {
+  width: 88px;
+  height: auto;
+  margin-bottom: 14px;
+  animation: flx-logo-in 0.4s ease-out both;
+}
+
+/* No dedicated wordmark asset exists under apps/web/src/assets (only the
+   mark/symbol PNG) — rendered as text instead, matching the wordmark's
+   actual styling from apps/web/src/styles/design.css
+   (.mkt-nav__wordmark / .mkt-footer__brand-mark span: same font-display
+   stack, weight 700, tight -0.01em tracking, "Fluxio" title-case text).
+   "Onest" itself isn't bundled with this unbundled, no-external-fonts
+   extension, so it silently falls back to the same ui-sans-serif/system-ui
+   chain apps/web already lists after it — no network font fetch, no new
+   dependency. font-size is an eyeballed value landing the text around the
+   requested ~100-120px width; nudge it later if a real render disagrees. */
+.brand-wordmark {
+  font-family: 'Onest', ui-sans-serif, system-ui, 'Segoe UI', sans-serif;
+  font-weight: 700;
+  font-size: 2.25rem;
+  letter-spacing: -0.01em;
+  color: var(--flx-text);
+  margin-bottom: 14px;
+  animation: flx-logo-in 0.4s ease-out both;
+}
+
+@keyframes flx-logo-in {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .brand-logo,
+  .brand-wordmark { animation: none; }
+}
+
+.unlock-heading {
+  font-size: 1.05rem;
+  font-weight: 600;
+  margin: 0 0 20px;
+}
+
+.unlock-form {
+  width: 100%;
+}
+
+/* ---- Zone 1: deep teal account zone ---- */
+
+.zone-top {
+  position: relative;
+  z-index: 1;
+  background: linear-gradient(160deg, var(--flx-zone-green-from), var(--flx-zone-green-to));
+  padding: 18px 18px 36px;
+}
+
+.account-card {
+  position: relative;
+  overflow: hidden;
+  background: var(--flx-card);
+  border-radius: var(--flx-radius-lg);
+  padding: 16px;
+  margin-bottom: 14px;
+}
+
+/* Prompt 0120 Revision 2 (SECOND rewrite — see the prompt archive entry
+   for the full history): TWO hand-built SVG chevron ornaments were tried
+   here and both were rejected by the user as not matching the reference
+   image's own visual nuance closely enough. This revision replaces the
+   SVG entirely with the reference image itself: apps/extension/assets/
+   card-accent.png is a direct crop of assets/reference-card-accent.png
+   (the user-supplied full-card mockup), containing only the chevron
+   accent region — cropped from strictly inside the mockup's own opaque
+   card area (verified pixel-by-pixel via the alpha channel, see the
+   prompt archive entry for the exact crop rectangle) so every edge of
+   the crop is plain card-black, no white/transparent background bleed
+   and no rounded-corner arc included. Since that crop's own background
+   is already near-black and this card is pure #000000 (this feature's
+   own Original change), the two blacks meet seamlessly with no
+   transparency needed in the PNG itself (flattened onto black at crop
+   time).
+   `object-fit: cover` + `object-position: right bottom` on the <img>
+   crops-to-fill without ever stretching (object-fit: fill would distort
+   the chevrons) — favoring the crop's own right portion, where the
+   accent is densest, exactly like the reference.
+
+   POSITION TUNING (small follow-up to the pass above, still filed under
+   this same Revision 2): the motif initially sat too high — colliding
+   with the header icon row at the top while leaving the card's bottom
+   (behind/below the EVM chip) nearly bare. The first fix attempted was
+   an `object-position` vertical tweak alone, per instruction — but that
+   turned out to be mathematically incapable of ever moving anything:
+   `height: 100%` was missing here (the <img>'s height was silently
+   defaulting to its own intrinsic aspect ratio at the fixed 200px
+   width, not stretching to the card's actual height — added below,
+   genuinely a bug, not a style choice), and even after fixing that, the
+   ORIGINAL 594x505 crop was landscape (wider than tall) while this
+   container is closer to portrait — under `object-fit: cover`, when the
+   source is proportionally wider than the container, height is always
+   the constraining axis, which by definition of `cover` means the
+   scaled image's height exactly equals the container's height with
+   ZERO vertical slack, unconditionally, no matter what
+   `object-position`'s Y component is set to (confirmed with live
+   `getBoundingClientRect()`/`naturalWidth` measurements, not just
+   visual guessing). card-accent.png was therefore re-cropped narrower
+   (400px wide instead of 594px, same 505px height, same right-anchored
+   x=794..1194 window into the source photo) specifically to flip which
+   axis `cover` constrains — a narrower-than-container-aspect source
+   makes WIDTH the constrained axis instead, which leaves genuine
+   vertical slack for `object-position`'s Y component to actually use.
+   `right bottom` was chosen over intermediate percentages after
+   comparing headless renders side by side: it uses the full available
+   vertical slack, visibly clearing the header-icon row while giving the
+   card's bottom real motif coverage, without needing an arbitrary
+   percentage that would drift from "structurally correct" the next time
+   this container's exact height changes.
+
+   Because the popup's fixed-width, full-card-height container is
+   narrower/taller than the source crop's own aspect ratio, `cover`
+   scaling crops some of the crop's own left-side pure-black fade
+   runway away, which can leave a harder left edge than the source
+   photo's own gradual fade — covered by the `mask-image` linear-gradient
+   below (transparent at the left edge, opaque by ~45% across),
+   independent of and in addition to whatever fade survives from the
+   source crop itself. Full card height (top+bottom, no fixed height)
+   unchanged from the prior two SVG attempts; width is a fixed px (not
+   %) since the popup's own width — and so the account card's — never
+   varies. Same .account-card `overflow: hidden` clipping mechanism as
+   before, unchanged, still what actually confines this to the card's
+   own rounded-rectangle bounds.
+
+   WIDTH TUNING (a second small follow-up, still filed under this same
+   Revision 2): at the original 200px, the motif reached far enough left
+   to approach the fiat total ($0.00) — the reference keeps its accent
+   confined to roughly the right third to right-half of the card, with
+   generous plain-black breathing room on the left, which 200px didn't
+   preserve. Rendered 120px/135px/150px candidates side by side (pixel-
+   diffed to confirm they're genuinely different renders, not a no-op —
+   object-fit:cover always fills its container exactly, so container
+   width directly controls the accent's on-screen footprint here, unlike
+   the object-position Y case above) and compared each against the
+   reference's own proportion (its visible motif spans roughly 37-49% of
+   its card's width). 135px (~40% of this card's own width) was chosen
+   as the middle candidate — comfortably clear of the card's horizontal
+   center, closer to the reference's own generosity than the narrowest
+   120px option, without the least margin of the 150px option. The
+   existing percentage-based `mask-image` fade needed no adjustment —
+   confirmed by rendering at 135px and checking the left edge stays
+   smooth, not abruptly cut; percentage stops naturally scale down
+   proportionally with a narrower box, which turned out to still look
+   right without hardcoding fixed-px stops. */
+.account-card__ornament {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 135px;
+  /* Genuinely load-bearing, not decorative: without this, an <img> with
+     only `width` set falls back to sizing itself by its own intrinsic
+     aspect ratio, silently ignoring `top:0;bottom:0` — see the position-
+     tuning note above for how this was found (a real bug, not a style
+     choice) and why it mattered for object-position to work at all. */
+  height: 100%;
+  object-fit: cover;
+  object-position: right bottom;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, rgba(0, 0, 0, 0.55) 22%, #000 45%);
+  mask-image: linear-gradient(to right, transparent 0%, rgba(0, 0, 0, 0.55) 22%, #000 45%);
+}
+
+/* Prompt 0121 "Card background: Plain" — hides the ornament without
+   removing the <img> tag or its src (see popup.js's own renderWalletReady
+   comment: the tag is always emitted, only this modifier class is
+   conditional), so switching back to Accent never re-fetches/re-decodes
+   the image. */
+.account-card__ornament--hidden {
+  display: none;
+}
+
+/* Alignment container for the card's top row: puts the label and the lock
+   button on a real flex baseline instead of hand-tuned absolute-position
+   offsets, so the lock button is genuinely vertical-centered against the
+   label rather than approximately centered via guessed pixel math. Needs
+   its own stacking context (position:relative + z-index:1) for the same
+   reason .chip below does — the ornament SVG is position:absolute, and
+   per normal CSS paint order a positioned box paints over plain in-flow
+   content, so without this the ornament would sit on top of the label/lock
+   instead of subtly behind them. */
+.account-card__header {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+/* Multi-account: this is always the account switcher button now (a plain
+   <div> before this feature) — reset the inherited button chrome, then
+   redraw exactly the same label look it already had, plus a chevron and
+   a hover state signaling it's interactive. */
+button.account-card__label {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--flx-text-muted);
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: inherit;
+  transition: color var(--flx-transition);
+}
+
+button.account-card__label:hover {
+  color: var(--flx-text);
+}
+
+/* Refresh, Settings, Lock — in that order, left to right, lock always
+   rightmost/outermost. One shared small-circle style for all three so
+   they read as a single cohesive group, not three mismatched controls. */
+.account-card__header-actions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.account-card__icon-btn {
+  /* relative (prompt 0170): the Notifications bell's own .notif-dot below
+     positions itself against this button, not the whole header row. */
+  position: relative;
+  flex: none;
+  /* ~32px minimum comfortable tap target, per instruction — was 28px
+     back when this was lock-only. */
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--flx-border);
+  border-radius: 50%;
+  color: var(--flx-text-muted);
+  cursor: pointer;
+  padding: 0;
+  margin: 0;
+  transition: color var(--flx-transition), border-color var(--flx-transition);
+}
+
+.account-card__icon-btn:hover {
+  color: var(--flx-text);
+  border-color: var(--flx-accent);
+}
+
+/* Icons here reuse ICONS.refresh/.settings/.lock from popup.js, whose
+   embedded viewBox-relative width/height attributes were sized for the
+   old, larger contexts (the 44px action-row bubble, or the lock button's
+   own original standalone size) — CSS width/height on the <svg> overrides
+   those attributes in every evergreen browser, so this is the one place
+   all three are forced to a single consistent visual size instead of
+   duplicating differently-sized icon strings. */
+.account-card__icon-btn svg {
+  width: 15px;
+  height: 15px;
+}
+
+.account-card__icon-btn.spinning svg {
+  animation: flx-spin 0.8s linear infinite;
+}
+
+/* Portfolio fiat total (prompt 0118) — the biggest number on this card,
+   deliberately: one clean total up top (Phantom's own layout was the
+   explicit visual reference), no per-asset fiat values anywhere on this
+   screen. Sits between the header row and the address chips. */
+.account-card__total {
+  position: relative;
+  z-index: 1;
+  margin-bottom: 12px;
+}
+
+.account-card__total-value {
+  font-size: 1.9rem;
+  font-weight: 700;
+  color: var(--flx-text);
+  line-height: 1.15;
+  /* Long-value overflow guard for a very large total in a currency with a
+     long symbol/no thousands abbreviation (e.g. a large IDR amount) —
+     shrinks to fit its single line rather than wrapping or clipping. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Subtle, honest "some assets aren't in this total" indicator — never
+   hidden silently, but deliberately small/muted text rather than a loud
+   badge, matching the spec's own "indikasi kecil yang jujur" wording. */
+.account-card__total-hint {
+  margin-top: 2px;
+  font-size: 0.7rem;
+  color: var(--flx-text-muted);
+  cursor: default;
+}
+
+.account-card__chips {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.chip {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--flx-border);
+  border-radius: var(--flx-radius-sm);
+  padding: 8px 10px;
+  color: var(--flx-text);
+  font-family: 'Courier New', monospace;
+  font-size: 0.76rem;
+  cursor: pointer;
+  margin: 0;
+  text-align: left;
+  transition: border-color var(--flx-transition);
+}
+
+.chip:hover {
+  border-color: var(--flx-accent);
+}
+
+.chip__icon {
+  flex: none;
+  display: flex;
+  color: var(--flx-text-muted);
+}
+
+.chip.chip--copied {
+  border-color: var(--flx-accent);
+  color: var(--flx-accent);
+}
+
+.chip.chip--copied .chip__icon {
+  color: var(--flx-accent);
+}
+
+/* ---- Action row (Send / Receive / Buy / Swap — Refresh/Settings moved to
+   the account card header, alongside Lock; see .account-card__icon-btn) ---- */
+
+.action-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.action-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  color: var(--flx-text);
+  cursor: pointer;
+  padding: 0;
+  margin: 0;
+}
+
+.action-btn__icon {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--flx-card);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 50%;
+  color: var(--flx-text);
+  transition: border-color var(--flx-transition), background-color var(--flx-transition);
+}
+
+.action-btn:hover .action-btn__icon {
+  border-color: var(--flx-accent);
+}
+
+.action-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.action-btn:disabled .action-btn__icon {
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+.action-btn__label {
+  font-size: 0.68rem;
+  /* Sits directly on the deep-teal zone background (unlike every other
+     muted label in this file, which sits on a near-black surface) —
+     --flx-text-muted's contrast against that lighter green background is
+     too close to the AA small-text threshold, so this uses a lighter
+     shade specifically for on-zone text instead. */
+  color: #C7D0DB;
+}
+
+.action-btn__icon.spinning svg {
+  animation: flx-spin 0.8s linear infinite;
+}
+
+/* Optical correction only: the paper-plane glyph's ink is concentrated in
+   its lower-left wingspan versus a single thin point at the upper-right
+   nose, so geometric bounding-box centering reads as slightly off-center
+   inside the circular button. Nudged a hair right + down so it lines up
+   with the other three icons by eye. */
+#actionSend .action-btn__icon svg {
+  transform: translate(-0.9px, 1px);
+}
+
+@keyframes flx-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .action-btn__icon.spinning svg { animation: none; }
+}
+
+/* ---- Zone 2: near-black bottom sheet, curved corners overlapping zone-top ---- */
+
+.zone-bottom {
+  position: relative;
+  z-index: 2;
+  margin-top: -22px;
+  background: var(--flx-panel);
+  border-radius: var(--flx-radius-xl) var(--flx-radius-xl) 0 0;
+  padding-top: 6px;
+}
+
+.zone-bottom__scroll {
+  max-height: min(340px, 60vh);
+  overflow-y: auto;
+  padding: 14px 16px 16px;
+}
+
+.panel-header {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--flx-text-muted);
+  margin-bottom: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.network-list {
+  display: flex;
+  flex-direction: column;
+  /* No gap here — group-to-group separation lives entirely on
+     .network-block:not(:first-child) below, as one named
+     --flx-space-group value, rather than being split across two
+     different numbers (this gap + that block's own margin) that would
+     have to be kept in sync by hand. */
+  gap: 0;
+}
+
+.network-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 6px;
+  border-radius: var(--flx-radius-md);
+}
+
+.network-row:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.network-row__logo {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  flex: none;
+  object-fit: cover;
+  background: var(--flx-card);
+}
+
+.network-row__meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.network-row__name {
+  font-size: 0.86rem;
+  color: var(--flx-text);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.network-row__right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.network-row__value {
+  color: var(--flx-text);
+  font-variant-numeric: tabular-nums;
+  font-family: 'Courier New', monospace;
+  font-size: 0.86rem;
+  font-weight: 600;
+  min-width: 64px;
+  text-align: right;
+}
+
+.network-row__value.skeleton {
+  display: inline-block;
+  width: 64px;
+  height: 14px;
+  vertical-align: middle;
+}
+
+.network-row__value--zero {
+  color: var(--flx-text-faint);
+  font-weight: 400;
+}
+
+.network-row__value--error {
+  color: var(--flx-danger);
+  font-family: Arial, sans-serif;
+  font-weight: 400;
+  font-size: 0.76rem;
+}
+
+/* Wraps a network-row together with its (optional) token-list below it,
+   so a network and its own tokens are one flex item network-list's `gap`
+   (zero, see above) would otherwise have split apart. A hairline top
+   border on every block but the first is the "pemisah halus
+   antar-kelompok" this screen's token-row hierarchy pass added — the
+   one, single source of group-to-group spacing (see --flx-space-group's
+   own comment above), not split across two different numbers. */
+.network-block {
+  display: flex;
+  flex-direction: column;
+}
+
+.network-block:not(:first-child) {
+  border-top: 1px solid var(--flx-border);
+  margin-top: var(--flx-space-group);
+  padding-top: var(--flx-space-row);
+}
+
+/* Token balances (SPL/ERC-20) nested under their parent network row —
+   empty (no markup at all) when a network holds no tokens, so this adds
+   no visual weight in the common case (the `:empty` rule right below
+   makes that literal — no reserved padding until there's actually
+   something to show). Indented to align under the network name, past
+   its 28px logo + gap — the same 38px every token row's own left edge
+   starts at, so the parent/child relationship reads from indentation
+   alone, not just smaller/dimmer styling.
+
+   `padding-top`/`gap` both use --flx-space-row, so the native row -> its
+   first token row transition has the exact same rhythm as token row ->
+   token row — one consistent number for every "sibling row" gap in this
+   group, not two different ones that happen to look similar. `gap`
+   specifically gives every pair of adjacent token rows that SAME
+   comfortable rhythm regardless of whether either neighbor is a plain
+   one-line row (a recognized token) or a two-line row (an "Unknown"
+   token's symbol + its address line, see .token-row__address below) —
+   flexbox `gap` applies uniformly between children no matter their
+   individual height, so a two-line row's address text never reads as
+   bleeding into the next row the way the previous, much tighter gap did
+   (confirmed as a real problem in manual verification). --flx-space-row
+   is also deliberately smaller than --flx-space-group (used one level up
+   on .network-block), so a network's own tokens still read as one
+   tighter-knit group than the space before the next network — no
+   trailing bottom padding here at all, since that larger separation is
+   already fully handled by the NEXT network-block's own margin-top,
+   not by this element's own box. */
+.token-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--flx-space-row);
+  padding: var(--flx-space-row) 6px 0 38px;
+}
+
+.token-list:empty {
+  padding-top: 0;
+}
+
+.token-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.token-row__logo {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+/* Prompt 0206: an EMBEDDED token icon in the same 18px slot the letter
+   placeholder uses — object-fit keeps a non-circular source honest inside
+   the rounded frame instead of stretching it. */
+.token-row__logo--img {
+  object-fit: contain;
+  background: transparent;
+}
+
+/* The Swap screen's pay/receive asset buttons carry the same icon before
+   the symbol (prompt 0206) — the button is already a flex row with its
+   own gap, so the icon needs no extra spacing of its own. */
+
+/* Wraps the symbol line + an optional second line (see .token-row__address
+   below) — always present even for a recognized token with no second
+   line, so a row never visually jumps between one-line and two-line
+   layouts depending on its neighbors. */
+.token-row__meta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--flx-space-line);
+}
+
+.token-row__name {
+  font-size: 0.78rem;
+  color: var(--flx-text-faint);
+}
+
+/* Second line under an "Unknown" token's symbol — its truncated mint/
+   contract address, the only thing that tells apart two otherwise-
+   identical "Unknown" rows (a real problem found during manual
+   verification: four indistinguishable "Unknown" rows in one list).
+   Never rendered for a recognized token — see tokenRowMarkup()'s own
+   comment. Deliberately smaller/dimmer than .token-row__name itself —
+   secondary to the secondary, so it reads as supporting detail, not a
+   second token name. */
+.token-row__address {
+  font-size: 0.66rem;
+  color: var(--flx-text-faint);
+  opacity: 0.7;
+  font-family: 'Courier New', monospace;
+}
+
+.token-row__value {
+  color: var(--flx-text);
+  font-variant-numeric: tabular-nums;
+  font-family: 'Courier New', monospace;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.token-row--skeleton {
+  color: var(--flx-text-faint);
+  font-size: 0.72rem;
+}
+
+.token-row--error {
+  color: var(--flx-danger);
+  font-size: 0.72rem;
+}
+
+/* ---- Manage Tokens (Settings -> Manage Tokens — the only entry point
+   into token management anywhere in the popup; the main wallet screen
+   carries none, deliberately, so it stays pure balances) ---- */
+
+.network-picker__hint {
+  margin-left: auto;
+  color: var(--flx-text-faint);
+  font-size: 0.72rem;
+  flex: none;
+}
+
+.token-manage-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.token-manage-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 6px;
+  border-radius: var(--flx-radius-md);
+  background: var(--flx-surface-2);
+  border: 1px solid var(--flx-border);
+}
+
+.token-manage-row__meta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.token-manage-row__symbol {
+  font-size: 0.86rem;
+  color: var(--flx-text);
+  font-weight: 600;
+}
+
+.token-manage-row__address {
+  font-size: 0.7rem;
+  color: var(--flx-text-faint);
+  font-family: 'Courier New', monospace;
+}
+
+.token-manage-row__remove {
+  flex: none;
+  font-size: 0.72rem;
+}
+
+.token-manage-row__remove--confirm {
+  color: var(--flx-danger);
+  font-weight: 600;
+}
+
+/* ---- Activity (transaction history) ---- */
+
+.activity-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.activity-header h1,
+.activity-header .desc {
+  margin-bottom: 0;
+}
+
+/* Small "chain history failed, local sends still shown" notice — see
+   loadActivity()'s own comment for why this exists instead of a blank
+   error screen. Reuses .warning's color language (theme.css) at a much
+   smaller scale — this is an inline notice, not a full warning card. */
+.activity-banner {
+  background: rgba(255, 184, 76, 0.1);
+  border: 1px solid rgba(255, 184, 76, 0.35);
+  color: var(--flx-warn);
+  border-radius: var(--flx-radius-sm);
+  padding: 8px 10px;
+  font-size: 0.74rem;
+  line-height: 1.4;
+  margin: 10px 0;
+}
+
+.activity-empty {
+  margin-top: 16px;
+  text-align: center;
+}
+
+.activity-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--flx-space-row);
+  margin-top: 10px;
+}
+
+.activity-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 6px;
+  border-radius: var(--flx-radius-md);
+  background: var(--flx-surface-2);
+  border: 1px solid var(--flx-border);
+}
+
+.activity-row__icon {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--flx-text-muted);
+}
+
+/* ICONS.send (popup.js) is Feather's paper-plane glyph: `<line x1="22" y1="2"
+   x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>` on a
+   0 0 24 24 viewBox. Its geometric bounding box IS exactly centered in
+   that viewBox (measured live via getBoundingClientRect: offset ~0,0 —
+   flex centering alone gets that part right), but its actual painted
+   "ink" — the filled triangle plus stroke — is NOT: measured with a real
+   alpha-weighted pixel centroid (rasterized the live SVG onto an offscreen
+   canvas, summed every non-transparent pixel's position weighted by its
+   alpha) rather than guessed, the visual mass sits at roughly
+   (+1.87, -1.92) viewBox units off-center — right and up — which is
+   exactly the "not quite centered" the paper plane read as in review.
+   ICONS.receive/--swap measured centered-enough by the same method (their
+   own offsets are ~0 on the X axis; --in's Y-axis bias reads as normal for
+   a download-tray glyph and was never the complaint), so this nudge is
+   scoped to --out only, per that finding — not to the shared
+   `.activity-row__icon svg` selector, which would have shifted every
+   direction equally including the two that already look right.
+   `overflow: visible` is needed because the corrected position pushes the
+   icon a little past its own nominal 20x20 box; the 30px circle has a 5px
+   gutter on every side (this container is flex-centered, not overflow-
+   hidden), so nothing clips against the circle itself.
+   The home screen's own Send button (`#actionSend .action-btn__icon svg`,
+   above `.action-btn__icon.spinning`) already has its own by-eye nudge for
+   this exact same glyph (`translate(-0.9px, 1px)`, its own comment says
+   "nudged a hair... by eye") — smaller than this measured value, and left
+   untouched here on purpose: that's a different screen/selector, out of
+   this fix's scope. */
+.activity-row__icon--out svg {
+  display: block;
+  overflow: visible;
+  transform: translate(-1.56px, 1.6px);
+}
+
+/* Incoming gets the accent teal (a small "good news" cue, the same
+   color language --flx-accent already carries everywhere else in this
+   popup) — outgoing stays neutral, matching the paper-plane's already-
+   muted look in the main action row. */
+.activity-row__icon--in {
+  color: var(--flx-accent);
+}
+
+/* Swap entries (prompt 0115) — same accent teal as an incoming transfer;
+   a swap isn't "good news" the way a receive is, but it's a distinct
+   third category from plain in/out, so it gets its own visual weight
+   rather than defaulting to the neutral outgoing look. */
+.activity-row__icon--swap {
+  color: var(--flx-accent);
+}
+
+.activity-row__meta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.activity-row__label {
+  font-size: 0.84rem;
+  color: var(--flx-text);
+}
+
+.activity-row__counterparty {
+  color: var(--flx-text-faint);
+  font-family: 'Courier New', monospace;
+  font-size: 0.78rem;
+}
+
+.activity-row__time {
+  font-size: 0.7rem;
+  color: var(--flx-text-faint);
+}
+
+.activity-row__right {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.activity-row__amount {
+  font-variant-numeric: tabular-nums;
+  font-family: 'Courier New', monospace;
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--flx-text);
+}
+
+.activity-row__amount--in {
+  color: var(--flx-accent);
+}
+
+/* Prompt 0206 butir 4: a swap row's amounts stack as two nowrap lines so
+   a long pair (e.g. "1.087538 USDT" / "→ 0.009727 SOL") never collides
+   with the left column; the meta column keeps a floor so "Swap" + the
+   timestamp always keep their own space. Scoped to .activity-row--swap —
+   Sent/Received rows are untouched. */
+.activity-row--swap .activity-row__meta {
+  min-width: 64px;
+}
+
+.activity-row__swap-amount {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.activity-row__swap-line {
+  white-space: nowrap;
+}
+
+/* Prompt 0210: a chain-derived swap that FAILED on chain has no amount
+   lines — this honest one-sentence note takes their place. Wrapping
+   text (never nowrap: it is a sentence, not a number). */
+.activity-row__swap-note {
+  font-size: 12px;
+  color: var(--flx-text-dim, #8b93a7);
+  text-align: right;
+  max-width: 180px;
+}
+
+.activity-row__right-bottom {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.activity-row__status {
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+}
+
+.activity-row__status--pending {
+  color: var(--flx-warn);
+}
+
+.activity-row__status--confirmed {
+  color: var(--flx-text-faint);
+}
+
+.activity-row__status--failed {
+  color: var(--flx-danger);
+}
+
+/* Same targeted override precedent as .swap-settings-row .link (prompt
+   0169's own comment there): the shared button.link base rule (theme.css)
+   underlines by design for plain hyperlink-style links elsewhere in this
+   popup, but a trailing "View" on a transaction row reads as a small
+   inline action, not a hyperlink — screenshot feedback confirmed the
+   underline read as visual noise. Scoped to this one selector only, so
+   every other intentionally-underlined button.link elsewhere is untouched.
+   Hover/focus affordance is kept, not dropped: reuses the exact
+   filter:brightness(1.06) idiom this codebase already applies to every
+   other interactive button (button.primary/button.danger in theme.css,
+   .approve in approval.html) rather than inventing a new one, so the
+   underline's removal doesn't leave this control with zero affordance.
+   Selector note (a real bug caught live, not assumed): a bare
+   `.activity-row__explorer` (specificity 0,1,0) loses to theme.css's own
+   `button.link` (0,1,1, a class + an element type) regardless of source
+   order — confirmed live, the underline stayed even with text-decoration:
+   none written here. `.activity-row .activity-row__explorer` (0,2,0) — the
+   same two-class-descendant shape .send-amount-row/.swap-box__row/
+   .swap-settings-row's own `.link` overrides already use — clears that
+   bar the same way theirs do, and matches this element's real DOM
+   nesting (the button is always inside a `.activity-row`). */
+.activity-row .activity-row__explorer {
+  font-size: 0.7rem;
+  text-decoration: none;
+}
+
+.activity-row .activity-row__explorer:hover:not(:disabled),
+.activity-row .activity-row__explorer:focus-visible {
+  filter: brightness(1.06);
+}
+
+/* ---- Send / Receive flow (Tahap C/D — network-agnostic) ---- */
+
+.send-amount-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.send-amount-row input[type='text'] {
+  flex: 1;
+}
+
+.send-amount-row .link {
+  flex: none;
+  border: 1px solid var(--flx-border);
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 0.72rem;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.send-balance {
+  font-size: 0.82rem;
+}
+
+.confirm-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.84rem;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--flx-border);
+  color: var(--flx-text);
+}
+
+.confirm-row span:first-child {
+  color: var(--flx-text-muted);
+}
+
+.confirm-row--total {
+  border-bottom: none;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+.confirm-row--total span:first-child {
+  color: var(--flx-text);
+}
+
+.send-result__note {
+  font-size: 0.78rem;
+  text-align: center;
+}
+
+.network-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.network-picker button.secondary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+}
+
+.network-picker__logo {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  flex: none;
+}
+
+/* Trailing balance amount on an asset-picker row (prompt 0113 — the same
+   .network-picker list is reused for "pick a network" AND "pick an
+   asset", see renderSendAssetPicker()) — pushed to the row's right edge,
+   the same "logo + label + [space] + trailing value" layout token
+   rows/balance rows already use elsewhere in this popup. */
+.network-picker__balance {
+  margin-left: auto;
+  color: var(--flx-text-faint);
+  font-variant-numeric: tabular-nums;
+  font-family: 'Courier New', monospace;
+  font-size: 0.78rem;
+}
+
+.receive-copy-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+/* ---- Toast (currently only Buy's "Coming soon" — Swap got its own real
+   flow in prompt 0115, see popup.js's showToast()) ---- */
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%) translateY(6px);
+  background: var(--flx-card);
+  border: 1px solid var(--flx-border);
+  color: var(--flx-text);
+  font-size: 0.78rem;
+  padding: 8px 16px;
+  border-radius: 999px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 50;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.toast.toast--visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast {
+    transition: opacity 0.01ms linear;
+    transform: translateX(-50%);
+  }
+  .toast.toast--visible {
+    transform: translateX(-50%);
+  }
+}
+
+/* ---- Account drawer (multi-account — see popup.js's openAccountDrawer)
+   ---- */
+
+.drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 60;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.drawer-backdrop.drawer-backdrop--open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.drawer {
+  width: 260px;
+  max-width: 80%;
+  height: 100%;
+  background: var(--flx-panel);
+  border-right: 1px solid var(--flx-border);
+  box-shadow: 8px 0 24px rgba(0, 0, 0, 0.4);
+  transform: translateX(-100%);
+  transition: transform 0.25s ease;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: 12px;
+}
+
+.drawer-backdrop--open .drawer {
+  transform: translateX(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drawer-backdrop,
+  .drawer {
+    transition: none;
+  }
+}
+
+.drawer__header {
+  margin-bottom: 8px;
+}
+
+.drawer__list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.drawer-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px;
+  border-radius: var(--flx-radius-md);
+  border: 1px solid transparent;
+}
+
+.drawer-row--active {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: var(--flx-accent);
+}
+
+.drawer-row__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: transparent;
+  border: none;
+  padding: 4px;
+  margin: 0;
+  cursor: pointer;
+  color: var(--flx-text);
+  text-align: left;
+}
+
+.drawer-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.drawer-row__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.86rem;
+}
+
+.drawer-row__rename {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--flx-text-muted);
+  cursor: pointer;
+  padding: 0;
+  margin: 0;
+  border-radius: 50%;
+  transition: color var(--flx-transition), background-color var(--flx-transition);
+}
+
+.drawer-row__rename:hover {
+  color: var(--flx-accent);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.drawer-row__rename-form {
+  flex: 1;
+  min-width: 0;
+  padding: 4px;
+}
+
+.drawer-row__rename-input {
+  width: 100%;
+  margin-bottom: 0;
+  padding: 5px 8px;
+  font-size: 0.86rem;
+}
+
+.drawer__footer {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--flx-border);
+}
+
+.drawer__add {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  background: transparent;
+  border: 1px dashed var(--flx-border);
+  border-radius: var(--flx-radius-md);
+  padding: 10px;
+  color: var(--flx-text-muted);
+  cursor: pointer;
+  margin: 0;
+  transition: color var(--flx-transition), border-color var(--flx-transition);
+}
+
+.drawer__add:hover {
+  border-color: var(--flx-accent);
+  color: var(--flx-text);
+}
+
+.drawer__add:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* ---- Swap (prompt 0115 quotes; prompt 0200 real execution) ---- */
+
+/* Prompt 0200 fase 2 — the Swapped screen's "View on explorer" is an <a>
+   (a real link with a real href, so it can open a tab), but theme.css's
+   shared button rules are button.secondary-scoped and never match an
+   anchor — unstyled, it rendered as inline underlined text overlapping
+   the Status row. This mirrors button.secondary's own box so the link
+   reads as the same kind of control. */
+a.swap-explorer-link {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 14px;
+  margin: 14px 0 8px;
+  font-size: 0.95rem;
+  border-radius: var(--flx-radius-md);
+  background: var(--flx-surface-2);
+  color: var(--flx-text);
+  border: 1px solid var(--flx-border);
+  text-align: center;
+  text-decoration: none;
+  transition: border-color var(--flx-transition);
+}
+a.swap-explorer-link:hover {
+  border-color: var(--flx-accent);
+}
+
+/* Reused on both the Send/Receive network-picker rows (unchanged) and the
+   Swap asset pickers' currently-selected row — a thin accent-colored
+   border, cheap to add without a new button variant. */
+.network-picker--active {
+  border-color: var(--flx-accent);
+}
+
+.swap-box {
+  background: var(--flx-surface-2);
+  border: 1px solid var(--flx-border);
+  border-radius: var(--flx-radius-md);
+  padding: 10px 12px;
+  margin-bottom: 6px;
+}
+
+.swap-box__header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.72rem;
+  color: var(--flx-text-faint);
+  margin-bottom: 6px;
+}
+
+.swap-box__balance {
+  font-variant-numeric: tabular-nums;
+}
+
+.swap-box__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Non-blocking degraded-state note (prompt 0116) — shown only when held-
+   token balances failed to load but the "You pay" box is still fully
+   usable (native SOL, unaffected). Deliberately styled as a small muted
+   line, not `.error` — a genuine error color here would misrepresent a
+   screen that's still fully functional as broken. */
+.swap-box__note {
+  margin: 6px 0 0;
+  font-size: 0.7rem;
+  color: var(--flx-warn);
+}
+
+.swap-box__row input[type='text'] {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 4px 0;
+  font-size: 1.05rem;
+}
+
+.swap-box__row input[type='text']:focus {
+  outline: none;
+}
+
+.swap-box__estimate {
+  flex: 1;
+  font-size: 1.05rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--flx-text-muted);
+  padding: 4px 0;
+}
+
+.swap-asset-btn {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--flx-card);
+  border: 1px solid var(--flx-border);
+  border-radius: var(--flx-radius-sm);
+  padding: 5px 8px;
+  color: var(--flx-text);
+  font-weight: 600;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.swap-box__row .link {
+  flex: none;
+  border: 1px solid var(--flx-border);
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 0.72rem;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+/* Centered between the two swap-box elements — a small negative margin
+   pulls it visually into the gap rather than adding its own dedicated
+   row, matching how compact this control reads in every reference swap
+   UI (Phantom included, per this feature's own "referensi kerapian
+   Phantom" instruction). */
+.swap-flip-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  margin: -8px auto 2px;
+  border-radius: 50%;
+  background: var(--flx-card);
+  border: 1px solid var(--flx-border);
+  color: var(--flx-text-muted);
+  cursor: pointer;
+  position: relative;
+  z-index: 1;
+}
+
+.swap-flip-btn:hover {
+  color: var(--flx-accent);
+  border-color: var(--flx-accent);
+}
+
+/* Prompt 0206 butir 1: the flip button dims (and stops reacting to hover)
+   until a receive token is picked; the hint below it explains why. */
+.swap-flip-btn:disabled,
+.swap-flip-btn:disabled:hover {
+  opacity: 0.45;
+  cursor: default;
+  color: var(--flx-text-muted);
+  border-color: var(--flx-border);
+}
+
+.swap-flip-hint {
+  text-align: center;
+  color: var(--flx-text-muted);
+  margin: 0 0 6px;
+}
+
+.swap-quote-panel {
+  margin: 4px 0 6px;
+}
+
+.swap-quote-panel:empty {
+  margin: 0;
+}
+
+.swap-settings-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 4px;
+}
+
+.swap-settings-row .link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.76rem;
+  /* Same override as .send-amount-row .link/.swap-box__row .link below —
+     the shared button.link base rule (theme.css) underlines by design for
+     plain text links elsewhere in this popup, but this control reads as a
+     small icon+label toggle, not a hyperlink; underlining just the gear
+     icon+"Slippage: X%" text read as a stray/broken link in review. No
+     :hover/:focus rule anywhere re-adds text-decoration on top of this,
+     so a single static override is enough — checked, not assumed. Scoped
+     to this one selector, not theme.css's shared rule, so every other
+     intentionally-underlined .link elsewhere is untouched. */
+  text-decoration: none;
+}
+
+.swap-settings-row .link svg {
+  width: 14px;
+  height: 14px;
+}
+
+.swap-slippage-panel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 10px;
+  margin-bottom: 8px;
+  background: var(--flx-surface-2);
+  border: 1px solid var(--flx-border);
+  border-radius: var(--flx-radius-md);
+}
+
+/* Prompt 0169 — a second, distinct bug found live while verifying the
+   input/button sizing fix below: popup.js's slippageBtn click handler
+   correctly toggles the `hidden` attribute (confirmed live — the DOM
+   attribute genuinely flips true/false/true across clicks), but the
+   panel never actually visually hides, because the author-origin rule
+   above (`.swap-slippage-panel { display: flex }`) beats the browser's
+   own UA-stylesheet `[hidden] { display: none }` rule at equal
+   specificity (author origin always wins a same-specificity tie against
+   UA origin, regardless of source order) — getComputedStyle confirmed
+   `display: flex` in every state, hidden attribute present or not. Fixed
+   the same targeted way as the button/input sizing below: one added
+   rule, no change to the click handler or any other hidden element. */
+.swap-slippage-panel[hidden] {
+  display: none;
+}
+
+.swap-slippage-preset {
+  flex: 1;
+  min-width: 52px;
+  padding: 6px 4px;
+  font-size: 0.8rem;
+}
+
+.swap-slippage-preset--active {
+  border-color: var(--flx-accent);
+  color: var(--flx-accent);
+}
+
+.swap-slippage-custom {
+  display: flex;
+  gap: 6px;
+  width: 100%;
+}
+
+/* Prompt 0169 — the shared button.secondary rule (theme.css) sets
+   width: 100%, which becomes this button's flex-basis inside this flex
+   row. Left unscoped, that basis alone (~100% of the row) consumes nearly
+   all the available space during flex-shrink, leaving the input (flex: 1,
+   i.e. flex-basis: 0%) collapsed to its intrinsic min-content width — a
+   ~20px sliver, exactly the bug this fixes. Scoped here rather than
+   touching the global button rule (per this prompt's own instruction),
+   since every other .secondary button elsewhere still wants width: 100%. */
+.swap-slippage-custom button {
+  flex: 0 0 auto;
+  width: auto;
+  margin-bottom: 0;
+}
+
+.swap-slippage-custom input[type='text'] {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin-bottom: 0;
+}
+
+/* ---- Notifications inbox (prompt 0170) ---- */
+
+/* The header bell icon's unread indicator — a small solid dot, top-right
+   corner of the button, color following the theme accent per this
+   feature's own explicit requirement ("warna badge mengikuti aksen
+   tema"). Absolutely positioned against .account-card__icon-btn's own
+   `position: relative` (see that rule's own comment above). */
+.notif-dot {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--flx-accent);
+  border: 1.5px solid var(--flx-surface);
+}
+
+.notif-empty {
+  margin-top: 8px;
+}
+
+.notif-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.notif-item {
+  padding: 12px;
+  background: var(--flx-surface-2);
+  border: 1px solid var(--flx-border);
+  border-radius: var(--flx-radius-md);
+}
+
+/* A subtly brighter left edge for a still-unread item — enough to scan
+   the list at a glance without relying on the dot alone (the dot itself
+   is small and sits inline in the header row, easy to miss on a quick
+   scroll). */
+.notif-item--unread {
+  border-left: 2px solid var(--flx-accent);
+}
+
+.notif-item__header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.notif-item__header .notif-dot {
+  /* Inline in the header row here, not the absolutely-positioned corner
+     dot the bell icon uses above — same visual token (a small solid
+     accent circle), different layout context. */
+  position: static;
+  border: none;
+  flex: none;
+}
+
+.notif-item__date {
+  margin-left: auto;
+  font-size: 0.72rem;
+  color: var(--flx-text-muted);
+}
+
+/* Level marker — reuses the exact three status colors this theme already
+   defines for TEST/LOCAL badges and the danger button (--flx-info/
+   --flx-warn/--flx-danger), per this feature's own instruction ("gaya
+   berbeda tapi konsisten tema") — a fourth, unrelated color palette for
+   the same info/warning/critical concept would just be visual noise this
+   theme doesn't need. */
+.notif-level {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.notif-level--info {
+  color: var(--flx-info);
+  background: rgba(76, 154, 255, 0.14);
+}
+
+.notif-level--warning {
+  color: var(--flx-warn);
+  background: rgba(255, 184, 76, 0.14);
+}
+
+.notif-level--critical {
+  color: var(--flx-danger);
+  background: rgba(255, 107, 107, 0.14);
+}
+
+.notif-item__title {
+  font-weight: 600;
+  color: var(--flx-text);
+  margin-bottom: 4px;
+  /* A 'plain'-format value is set via .textContent (see
+     renderNotificationRichField() in popup.js) — this preserves its
+     literal newlines visually without ever interpreting them as HTML. An
+     'html'-format value CAN also contain a raw newline — confirmed live
+     (prompt 0170's own verification): sanitizeRichHtml() only restricts
+     TAGS, it never strips/collapses literal whitespace in a text node —
+     so this rule renders both formats' own newlines the same way, not a
+     no-op for the html case as an earlier draft of this comment assumed. */
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.notif-item__body {
+  font-size: 0.86rem;
+  color: var(--flx-text-muted);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.notif-item__body a {
+  color: var(--flx-accent);
+}

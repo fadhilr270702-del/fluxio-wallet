@@ -1,0 +1,21 @@
+-- Prompt 0163 — mirrors migrations 0010/0019's own body_format/title_format
+-- precedent on telegram_broadcasts exactly, for announcements: title/body
+-- can now each independently be either raw plain text (every row created
+-- before this slice, and forever unless explicitly re-saved through the
+-- admin form) or pre-sanitized rich HTML restricted to
+-- <b><i><u><s><a href="https://...">  — see backend/src/utils/richHtml.js's
+-- sanitizeRichHtml(). Deliberately NO <tg-emoji> support: announcements are
+-- not a Telegram concept, so premium custom emoji simply doesn't apply here
+-- (see CLAUDE.md's own note on this distinction). Every pre-existing row
+-- backfills to 'plain' via the DEFAULT below, so nothing about how an old
+-- announcement displays changes — a legacy row containing literal Markdown
+-- syntax (the admin form's old "Markdown supported" label was never
+-- actually rendered by any consumer — see prompt 0163's own investigation)
+-- continues to display as literal text, exactly as before.
+--
+-- Plain ADD COLUMN with a DEFAULT + CHECK on the new columns only (not
+-- widening an existing constraint), so this runs through the default
+-- wrapped BEGIN/COMMIT path — no -- fluxio:manual-transaction marker needed,
+-- same as migrations 0009/0010/0019's own precedent.
+ALTER TABLE announcements ADD COLUMN title_format TEXT NOT NULL DEFAULT 'plain' CHECK (title_format IN ('plain', 'html'));
+ALTER TABLE announcements ADD COLUMN body_format TEXT NOT NULL DEFAULT 'plain' CHECK (body_format IN ('plain', 'html'));

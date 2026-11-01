@@ -1,0 +1,27 @@
+-- Prompt 0164 — per-broadcast recurring interval (1..24 hours, was a single
+-- fixed global RECURRING_INTERVAL_MS env value shared by every recurring
+-- broadcast) and an optional anchor start time. recurring_interval_hours
+-- defaults to 1 for every pre-existing row, matching the old global
+-- default's own 1-hour production value exactly — no behavior change for
+-- any broadcast that was already recurring before this migration.
+--
+-- recurring_starts_at is nullable and starts NULL for every row (old and
+-- new): NULL means "no anchor chosen yet" — for a "Mulai sekarang"
+-- activation, and for every legacy row, this is the permanent state until
+-- (and unless) a round actually sends; see recurringSchedule.js's own
+-- computeRecurringDue() and telegramBroadcastsRepo.js's recordRecurringSend()
+-- for how a NULL recurring_starts_at gets backfilled with the REAL first-
+-- send timestamp the moment a round first succeeds, giving every recurring
+-- broadcast — "start now" included — a genuine, drift-free anchor for every
+-- round after its first, without the admin ever having to pick one
+-- explicitly. A broadcast whose admin DID pick "Mulai pada jam tertentu"
+-- has this column set directly at creation instead, and that explicit
+-- choice is never overwritten by the backfill (see recordRecurringSend's
+-- own COALESCE).
+--
+-- Plain ADD COLUMN with a DEFAULT + CHECK on the new interval column only
+-- (not widening an existing constraint), so this runs through the default
+-- wrapped BEGIN/COMMIT path — no -- fluxio:manual-transaction marker
+-- needed, same as migrations 0009/0010/0019/0021/0022's own precedent.
+ALTER TABLE telegram_broadcasts ADD COLUMN recurring_interval_hours INTEGER NOT NULL DEFAULT 1 CHECK (recurring_interval_hours BETWEEN 1 AND 24);
+ALTER TABLE telegram_broadcasts ADD COLUMN recurring_starts_at TEXT;

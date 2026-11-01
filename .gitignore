@@ -1,0 +1,68 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+build/
+*.tsbuildinfo
+.turbo/
+
+# Env files — never commit real secrets. .env.example files are templates
+# and are explicitly un-ignored below.
+.env
+.env.*
+!.env.example
+!*/.env.example
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# SQLite runtime data (backend/) — local dev artifact, never commit the DB itself.
+backend/data/*.db
+backend/data/*.db-*
+backend/data/*.db-journal
+
+# Admin-uploaded files persisted on the server filesystem (prompt 0136's
+# welcome-message image) — mutable runtime content, not source, unlike the
+# committed static assets in backend/assets/.
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# Test / coverage output
+coverage/
+.nyc_output/
+
+# Editor / IDE
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Extension build artifact — bundled by esbuild from source, see apps/extension/build.mjs.
+apps/extension/background/background.bundle.js
+apps/extension/background/background.bundle.js.map
+
+# Extension release zips (prompt 0182) — build artifacts from
+# apps/extension/scripts/package-release.mjs, never committed.
+apps/extension/release/
+
+# Misc
+*.tmp
+*.temp
+.cache/
+
+# Claude Code local tool state — not project source.
+.claude/

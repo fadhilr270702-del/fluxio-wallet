@@ -1,0 +1,43 @@
+{
+  "manifest_version": 3,
+  "name": "Fluxio Wallet",
+  "version": "0.2.6",
+  "description": "Non custodial wallet for Solana and EVM chains. Your keys, your crypto. Swap on Solana and EVM chains. No added fee on transfers.",
+  "permissions": ["storage", "windows", "alarms"],
+  "host_permissions": [
+    "http://127.0.0.1:8899/*",
+    "http://127.0.0.1:8545/*",
+    "https://lite-api.jup.ag/*",
+    "https://aggregator-api.kyberswap.com/*",
+    "https://api.coingecko.com/*"
+  ],
+  "background": {
+    "service_worker": "background/background.bundle.js"
+  },
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content-script/inject.js"],
+      "run_at": "document_start"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["provider/provider.js", "provider/connect.js", "provider/signTransaction.js", "provider/signMessage.js"],
+      "matches": ["<all_urls>"]
+    }
+  ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

@@ -1,0 +1,33 @@
+-- Prompt 0166 — per-round send-result accounting for recurring broadcasts,
+-- added after a real incident: recurring broadcast 50287fba recorded a
+-- "successful" round (sent_count advanced, recurring_last_sent_at moved
+-- forward) while every single delivery attempt in that round actually
+-- failed with a network error (the laptop had just woken from sleep) —
+-- because the pre-0166 code only ever failed a round on a 429, and
+-- recordRecurringSend() never persisted anything about HOW a round went,
+-- only that it (supposedly) succeeded.
+--
+-- recurring_last_round_sent_count / recurring_last_round_failed_count hold
+-- the MOST RECENT successful round's own delivered/failed counts — NULL
+-- for every pre-existing row (no round has ever been retroactively
+-- measured) and for any row that has never completed a round since this
+-- migration. This is deliberately separate from the pre-existing
+-- `failed_count` column: that column's real, established meaning (see
+-- telegramBroadcastsRepo.js's own markChannelSendResult/
+-- incrementFailedCount) is "cumulative per-job failures in the
+-- subscriber-queue send path" (telegram_broadcast_recipients) — a
+-- recurring broadcast bypasses that queue entirely and never writes
+-- failed_count at all (confirmed: it stays 0 for the lifetime of every
+-- recurring broadcast, incident row included), so accumulating recipient
+-- failures into it here would silently overload one column with two
+-- incompatible meanings depending on send path. These two new columns are
+-- the recurring path's own, correctly-scoped equivalent — LAST ROUND only,
+-- not a lifetime total, since a recurring broadcast runs indefinitely and
+-- a running total across dozens of rounds would answer a much less useful
+-- question than "how did the most recent round actually go."
+--
+-- Plain ADD COLUMNs, no DEFAULT/CHECK (NULL is the correct default itself)
+-- — runs through the default wrapped BEGIN/COMMIT path, same as every
+-- other additive migration in this series.
+ALTER TABLE telegram_broadcasts ADD COLUMN recurring_last_round_sent_count INTEGER;
+ALTER TABLE telegram_broadcasts ADD COLUMN recurring_last_round_failed_count INTEGER;

@@ -1,0 +1,1961 @@
+/**
+ * Design tokens.
+ *
+ * Palette/type approach: warm paper background, deep slate ink, a dual
+ * gold + teal accent, generous whitespace, a fluid type scale, and soft
+ * editorial motion — inspired by fplus.ai's restrained, typography-led
+ * aesthetic. Light is the default reading mode (like the reference);
+ * [data-theme="dark"] swaps to a slate surface with the same accents.
+ */
+:root{
+  --paper: #faf7f0;
+  --slate: #273f48;
+  --slate-950: #16262c;
+  --slate-800: #1f333a;
+  --slate-600: #3a5661;
+  --gold: #dbb057;
+  --gold-600: #c99a3f;
+  --teal: #6fb3a8;
+  --teal-300: #a9dbd3;
+  --ink-muted: rgba(39,43,48,0.62);
+  --line: rgba(39,63,72,0.12);
+
+  /* Section-heading display type (prompt 0127) — replaces the old gold->teal
+     gradient with an ivory-porcelain sheen: --paper is this codebase's own
+     existing warm-ivory token (already used for the hero title/preloader),
+     reused here rather than inventing a parallel "ivory" constant;
+     --heading-silver is the one new token, a cool soft silver-grey chosen
+     specifically to sit close in lightness to --paper so the sheen reads as
+     one continuous, expensive-from-simplicity surface rather than a
+     visible two-tone band. Independent of --ink/--bg's per-scope
+     dark/light overrides elsewhere in this file (.mkt-page, the spotlight
+     section, [data-theme]) — these two are flat brand constants, not theme
+     variables, same treatment as --gold/--teal above. */
+  --heading-silver: #cdd2d3;
+
+  /* --heading-dim (prompt 0127 Revision 4, retired Revision 9): a
+     deliberately darker neutral-grey (#b3b7b8, 71.3% luminance) used as
+     the sweep gradients' "resting" stops instead of --paper, specifically
+     to widen the base-vs-glint contrast gap after Revision 1-3's sweep
+     read as "barely visible, shimmer and base almost the same tone."
+     Retired once the whole contrast strategy flipped in Revision 9: the
+     final composition ("putih-abu-teal") went back to keeping the base
+     BRIGHT (--paper/--heading-silver) and instead makes the teal band
+     itself narrow and brief — contrast now comes from a small, clearly
+     saturated band against a bright base, not from darkening the base to
+     stand apart from a bright peak. No live rule references this token
+     anymore (confirmed via grep before removal); kept only as history —
+     the token itself is gone. */
+
+  --bg: var(--paper);
+  --panel: #ffffff;
+  --ink: var(--slate);
+  --muted: var(--ink-muted);
+  --accent: var(--gold);
+  --accent-2: var(--teal);
+  --glass: rgba(39,63,72,0.04);
+  --card-grad: linear-gradient(135deg,var(--accent),var(--accent-2));
+
+  --radius: 16px;
+  --radius-sm: 10px;
+  --radius-pill: 999px;
+
+  --shadow-1: 0 1px 2px rgba(22,38,44,0.06), 0 12px 28px rgba(22,38,44,0.08);
+  --shadow-gold: 0 14px 34px rgba(219,176,87,0.28);
+
+  --ease-out: cubic-bezier(.16,1,.3,1);
+  --ease-in-out: cubic-bezier(.65,0,.35,1);
+  --dur-fast: .28s;
+  --dur: .6s;
+  --dur-slow: .9s;
+
+  --font-display: "Onest", ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+  --font-body: "IBM Plex Sans", ui-sans-serif, system-ui, "Segoe UI", Arial, sans-serif;
+
+  --container: 76rem;
+  --gutter: clamp(1.25rem, 4vw, 3rem);
+
+  --step--1: clamp(.83rem, .78rem + .24vw, .95rem);
+  --step-0: clamp(1rem, .94rem + .3vw, 1.05rem);
+  --step-1: clamp(1.2rem, 1.09rem + .55vw, 1.5rem);
+  --step-2: clamp(1.5rem, 1.28rem + 1.1vw, 2.1rem);
+  --step-3: clamp(2rem, 1.55rem + 2.25vw, 3.2rem);
+  --step-4: clamp(2.6rem, 1.7rem + 4.5vw, 5.2rem);
+}
+
+[data-theme="dark"]{
+  --bg: var(--slate-950);
+  --panel: var(--slate-800);
+  --ink: var(--paper);
+  --muted: rgba(250,247,240,0.62);
+  --line: rgba(250,247,240,0.12);
+  --glass: rgba(250,247,240,0.05);
+  --shadow-1: 0 1px 2px rgba(0,0,0,0.3), 0 16px 36px rgba(0,0,0,0.4);
+}
+
+*{box-sizing:border-box}
+/* Prompt 0201 — hide every scrollbar HANDLE app-wide (owner decision:
+   full-bleed look, desktop + mobile, both themes) while scrolling itself
+   stays fully functional (wheel/keyboard/trackpad/touch/Lenis untouched —
+   these properties only remove the painted bar, never scrollability).
+   Covers the document scrollbar (html) and the one overflow:auto element
+   apps/web has (#features .showcase__tabs — grep-verified the full list).
+   useLenis.js does not read scrollbar width anywhere, and nothing here
+   uses scrollbar-gutter; the one 100vw user (.privacy-flow7) only gets
+   MORE correct without a classic scrollbar (100vw no longer overshoots
+   clientWidth). Measured consequence, reported in the 0201 report: the
+   document gains the former scrollbar's 15px of width (clientWidth
+   1495 -> 1510 at a 1536 window) — a one-time widening, not a per-page
+   layout jump, since no page mixes bar-visible and bar-hidden states. */
+html{scrollbar-width:none;-ms-overflow-style:none}
+html::-webkit-scrollbar{display:none}
+#features .showcase__tabs{scrollbar-width:none;-ms-overflow-style:none}
+#features .showcase__tabs::-webkit-scrollbar{display:none}
+/* No scroll-behavior:smooth here — Lenis (see hooks/useLenis.js) now owns
+   scroll easing app-wide; leaving the CSS version on too would fight it
+   frame-by-frame on every anchor jump. When Lenis is off (reduced motion),
+   scroll is correctly instant instead of approximating "smooth". */
+body{
+  margin:0;
+  font-family:var(--font-body);
+  background:var(--bg);
+  color:var(--ink);
+  transition:background var(--dur) var(--ease-out), color var(--dur) var(--ease-out);
+  -webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;
+}
+h1,h2,h3,h4,.font-display{font-family:var(--font-display);letter-spacing:-0.02em;margin:0}
+p{line-height:1.65}
+a{color:inherit}
+::selection{background:var(--accent);color:var(--slate-950)}
+
+.container{max-width:var(--container);margin:0 auto;padding-inline:var(--gutter)}
+.eyebrow{
+  font-size:12.5px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--muted);display:flex;align-items:center;gap:10px;
+}
+.eyebrow::before{content:"";width:22px;height:1px;background:var(--gold);display:inline-block}
+
+/* Layout (dashboard app-shell) */
+.app-root{display:grid;grid-template-columns:260px 1fr;min-height:100vh;gap:20px}
+.sidebar-collapsed{grid-template-columns:80px 1fr}
+.app-main{padding:20px 28px}
+.app-content{margin-top:20px}
+
+.sidebar{background:var(--panel);box-shadow:var(--shadow-1);padding:22px;border-radius:var(--radius);height:calc(100vh - 40px);position:sticky;top:20px;display:flex;flex-direction:column;align-items:flex-start;gap:12px;width:260px;border:1px solid var(--line)}
+.sidebar .brand{background:transparent;border:none;cursor:pointer}
+.sidebar .sidebar-nav{display:flex;flex-direction:column;gap:8px;width:100%}
+.sidebar .nav-item{display:flex;align-items:center;gap:12px;padding:10px;border-radius:var(--radius-sm);color:var(--muted);text-decoration:none;transition:background var(--dur-fast),color var(--dur-fast)}
+.sidebar .nav-item:hover{background:var(--glass);color:var(--slate)}
+.sidebar .nav-item .icon{width:20px;height:20px;fill:currentColor}
+.sidebar-toggle{margin-top:auto;background:transparent;border:1px solid var(--line);padding:8px;border-radius:8px;color:var(--muted);cursor:pointer}
+
+/* Navbar (dashboard) */
+.navbar{display:flex;justify-content:space-between;align-items:center;padding:12px 18px;background:transparent}
+.nav-left .logo{font-weight:800;color:var(--accent);font-size:20px;border:none;background:transparent;cursor:pointer}
+.nav-actions{display:flex;gap:10px;align-items:center}
+.icon-btn{background:var(--panel);border:1px solid var(--line);padding:8px;border-radius:var(--radius-sm);color:var(--muted);cursor:pointer;transition:color var(--dur-fast),border-color var(--dur-fast)}
+.icon-btn:hover{color:var(--slate);border-color:var(--gold)}
+
+/* Cards & visuals */
+.card{background:var(--panel);padding:18px;border-radius:var(--radius);color:var(--muted);box-shadow:var(--shadow-1);border:1px solid var(--line)}
+.card .head{display:flex;justify-content:space-between;align-items:center}
+.animated-card{background:var(--panel);padding:18px;border-radius:var(--radius-sm);position:relative;overflow:hidden}
+.animated-card:before{content:"";position:absolute;inset:0;background:var(--card-grad);opacity:0.05;mix-blend-mode:multiply}
+
+.icon{width:20px;height:20px;display:inline-block}
+
+@keyframes floaty{0%{transform:translateY(0)}50%{transform:translateY(-6px)}100%{transform:translateY(0)}}
+.float{animation:floaty 5s ease-in-out infinite}
+
+/* Dashboard — bento layout instead of one flat two-column split */
+.dashboard h1{margin-bottom:18px}
+.stat-row{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:18px}
+.stat-tile{display:flex;align-items:center;gap:14px;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow-1)}
+.stat-tile__icon{width:42px;height:42px;border-radius:12px;background:var(--glass);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.stat-tile__icon .icon{width:20px;height:20px;color:var(--gold-600)}
+.stat-tile__label{display:block;font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.stat-tile__value{display:block;font-family:var(--font-display);font-size:19px;font-weight:700;margin-top:2px}
+.stat-tile__hint{display:block;font-size:11px;color:var(--muted);margin-top:2px}
+.dashboard-bento{display:grid;grid-template-columns:2fr 1fr;gap:16px;align-items:start}
+.dashboard-bento__main{display:flex;flex-direction:column;gap:14px}
+.dashboard-bento__side{display:flex;flex-direction:column;gap:12px}
+@media (max-width:900px){
+  .stat-row{grid-template-columns:1fr}
+  .dashboard-bento{grid-template-columns:1fr}
+}
+
+@media (max-width:900px){.app-root{grid-template-columns:1fr;}.sidebar{display:none}.app-main{padding:12px}}
+
+.topbar{position:sticky;top:0;backdrop-filter:blur(8px);border-bottom:1px solid var(--line);z-index:40;padding:14px 22px;background:color-mix(in srgb, var(--bg) 85%, transparent)}
+.topbar .nav-actions{align-items:center}
+
+.btn{transition:all var(--dur-fast) var(--ease-out);font-family:var(--font-body);cursor:pointer;border-radius:var(--radius-sm);border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:10px 14px;text-decoration:none}
+.btn:hover{border-color:var(--gold)}
+.btn-primary{position:relative;overflow:hidden;background:var(--accent);color:var(--slate-950);border-radius:var(--radius-sm);padding:10px 14px;font-weight:600;border-color:transparent}
+.btn-primary:hover{background:var(--gold-600);box-shadow:var(--shadow-gold);transform:translateY(-2px)}
+.btn-primary:active{transform:translateY(0)}
+/* Diagonal sheen sweep on hover — a single deliberate highlight, not a
+   generic color-shift. */
+.btn-primary::after{content:"";position:absolute;top:0;bottom:0;left:-60%;width:40%;background:linear-gradient(115deg,transparent,rgba(255,255,255,0.55),transparent);transform:skewX(-20deg);transition:left .65s var(--ease-out)}
+.btn-primary:hover::after{left:130%}
+.btn-primary .icon{transition:transform .35s cubic-bezier(.34,1.56,.64,1)}
+.btn-primary:hover .icon{transform:translateY(2px)}
+@media (prefers-reduced-motion:reduce){.btn-primary::after{transition:none}}
+
+.wallet-card{background:var(--panel)}
+.wallet-card .actions{display:flex;gap:8px}
+
+.token-list li{padding:8px;border-radius:var(--radius-sm)}
+.token-avatar{box-shadow:var(--shadow-1)}
+.token-row{transition:transform .12s ease, box-shadow .12s ease}
+.token-row:hover{transform:translateY(-4px);box-shadow:var(--shadow-1)}
+
+.brand-logo{height:28px;display:block}
+
+/* Preloader — hand-built motion graphics (no video), see Preloader.jsx.
+   Drifting glow orbs + a rising particle field behind a spring-in logo
+   reveal (icon pops in, wordmark wipes in beside it), holding for HOLD_MS
+   with a slow idle pulse before AnimatePresence plays the exit fade. */
+.preloader-overlay{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;overflow:hidden;background:radial-gradient(circle at 50% 42%,#0c1a26,#050a14 72%)}
+.preloader-bg{position:absolute;inset:0;pointer-events:none}
+.preloader-orb{position:absolute;border-radius:50%;filter:blur(70px);opacity:.4}
+.preloader-orb--teal{background:radial-gradient(circle,rgba(111,179,168,0.9),transparent 70%)}
+.preloader-orb--gold{background:radial-gradient(circle,rgba(219,176,87,0.85),transparent 70%)}
+.preloader-particle{position:absolute;border-radius:50%;background:var(--teal-300);box-shadow:0 0 8px rgba(169,219,211,0.8)}
+.preloader-box{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;gap:20px}
+.preloader-reveal{display:flex;align-items:center;gap:14px}
+.preloader-reveal__icon{width:60px;height:60px;filter:drop-shadow(0 0 24px rgba(111,179,168,0.5))}
+.preloader-reveal__word{font-family:var(--font-display);font-weight:700;font-size:32px;letter-spacing:-0.01em;color:var(--paper);display:inline-block}
+.preloader-bar{width:120px;height:3px;border-radius:999px;background:rgba(250,247,240,0.16);overflow:hidden}
+.preloader-bar__fill{height:100%;width:100%;border-radius:999px;background:linear-gradient(90deg,var(--gold),var(--teal-300));transform-origin:left}
+.preloader-caption{color:rgba(250,247,240,0.72);font-size:12.5px;font-family:var(--font-display);letter-spacing:.14em;text-transform:uppercase}
+@media (prefers-reduced-motion:reduce){.preloader-orb,.preloader-particle{animation:none;display:none}}
+
+/* Footer */
+.app-footer{margin-top:22px;padding:28px 0;color:var(--muted);border-top:1px solid var(--line)}
+.app-footer .footer-inner{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.app-footer .chains img{height:24px;margin-right:8px;opacity:0.85;transition:opacity var(--dur-fast)}
+.app-footer .chains img:hover{opacity:1}
+.footer-note{font-size:13px;color:var(--muted)}
+
+/* ============================= Marketing site ============================= */
+
+/* Permanently dark/cinematic, matching .hero-cinema further down this file —
+   same mechanism, one level up: redeclare --bg/--panel/--ink/--muted/--line/
+   --glass/--shadow-1 locally so every already-theme-var-driven landing
+   component (stats/features/steps/networks/vault/extension/faq/footer/nav)
+   cascades to dark automatically, with zero per-component changes. This is
+   deliberately NOT a change to :root/[data-theme="dark"] — the dashboard
+   (/dashboard, a separate DOM subtree that never nests inside .mkt-page)
+   keeps its own independent light/dark toggle working unaffected. Values
+   match .hero-cinema's own override exactly, so there's no visible seam
+   where the hero ends and the rest of the page begins. */
+.mkt-page{
+  background:var(--bg);
+  color:var(--ink);
+  min-height:100vh;
+  --bg:#000000;
+  --panel:rgba(255,255,255,0.06);
+  --ink:#ffffff;
+  --muted:rgba(255,255,255,0.66);
+  --line:rgba(255,255,255,0.18);
+  --glass:rgba(255,255,255,0.05);
+  --shadow-1:0 1px 2px rgba(0,0,0,0.4),0 16px 36px rgba(0,0,0,0.5);
+}
+
+/* Vertical section stack — see Landing.jsx. Each section is a normal
+   block-level element in normal document flow; ordinary vertical scroll,
+   no hijacking. This used to be a horizontal-scroll-hijack mechanism (a
+   tall vh-spacer + position:sticky + a framer-motion translateX track,
+   with these same values only active below a 900px breakpoint) — that
+   breakpoint's layout was already exactly this vertical-stack design, so
+   it was promoted to the permanent, only layout rather than kept as a
+   small-screen fallback for a mechanism that no longer exists. The
+   `h-scroll__` class prefix is a known leftover misnomer, kept to avoid
+   touching all 9 call sites in Landing.jsx for a cosmetic rename alone. */
+.h-scroll__slide{width:100%;min-height:100svh;position:relative;display:flex;align-items:center;justify-content:center;padding:96px var(--gutter) 48px}
+/* Pinned hero → Stats transition. .hero-pin-wrap is a tall spacer; its
+   sticky child (.hero-cinema) rides along the top of the viewport for the
+   wrapper's whole height, giving Landing.jsx's scroll-linked opacity/scale
+   (see useScroll/useTransform there) room to run before Stats scrolls up
+   underneath in ordinary flow. z-index keeps the still-visible hero
+   painting above Stats during that overlap — without it, later-DOM-order
+   Stats would paint over the sticky-but-still-opaque hero instead of the
+   hero authoritatively fading over it. --static (added when
+   prefers-reduced-motion is on, see Landing.jsx) drops this back to a
+   plain, unpinned section — the exact pre-pin layout. */
+.hero-pin-wrap{position:relative;height:170vh}
+.hero-pin-wrap .hero-cinema{position:sticky;top:0;z-index:5;height:auto;min-height:100svh}
+.hero-pin-wrap--static{height:auto}
+.hero-pin-wrap--static .hero-cinema{position:relative;z-index:auto}
+.h-scroll__stack{display:flex;flex-direction:column;gap:16px;width:100%;max-width:var(--container);margin:0 auto}
+.h-scroll__stack--center{align-items:center;text-align:center}
+
+/* Fixed nav */
+.mkt-nav{position:fixed;inset:0 0 auto;z-index:60;pointer-events:none;background:transparent;transition:background .4s var(--ease-out)}
+.mkt-nav--solid{background:rgba(0,0,0,0.86);backdrop-filter:blur(10px)}
+.mkt-nav__bar{display:flex;align-items:center;justify-content:space-between;padding:clamp(18px,3vw,34px) var(--gutter)}
+.mkt-nav__logo{pointer-events:auto;display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--ink)}
+.mkt-nav__logo img{height:30px;width:auto;display:block}
+.mkt-nav__wordmark{font-family:var(--font-display);font-weight:700;font-size:18px;letter-spacing:-0.01em}
+.mkt-nav__actions{pointer-events:auto;display:flex;align-items:center;gap:14px}
+.mkt-nav__cta{display:inline-flex;align-items:center;gap:8px;padding:9px 18px;border-radius:var(--radius-pill);background:var(--accent);color:var(--slate-950);font-weight:600;font-size:13.5px;text-decoration:none;transition:background .3s var(--ease-out),transform .3s var(--ease-out),box-shadow .3s var(--ease-out)}
+.mkt-nav__cta:hover{background:var(--gold-600);transform:translateY(-2px);box-shadow:var(--shadow-gold)}
+.mkt-nav__cta .icon{width:15px;height:15px}
+.mkt-nav__menu{display:flex;align-items:center;gap:12px;padding:8px 4px;background:transparent;border:none;cursor:pointer;color:var(--ink)}
+.mkt-nav__menu-label{font-size:13px;font-weight:600;letter-spacing:.14em;text-transform:uppercase}
+.mkt-nav__burger{display:flex;flex-direction:column;gap:5px;width:26px}
+.mkt-nav__burger-line{height:2px;width:26px;border-radius:2px;background:var(--ink);transition:background var(--dur-fast)}
+.mkt-nav__burger-line--accent{width:16px;align-self:flex-end;background:var(--gold)}
+
+/* Floating side badge — same visual idea as the reference's persistent
+   left-edge award badge (small icon + rotated label), but honest content:
+   Fluxio has no award to claim, so this links to the existing
+   "Non-custodial" claim already made in the Get-started section instead of
+   fabricating one. Hidden below 768px — a fixed left-edge element competes
+   with content on narrow screens, and it isn't load-bearing information. */
+.side-badge{position:fixed;left:0;top:50%;transform:translateY(-50%);z-index:55;display:flex;flex-direction:column;align-items:center;gap:10px;padding:14px 9px;background:var(--panel);border:1px solid var(--line);border-left:none;border-radius:0 14px 14px 0;text-decoration:none;color:var(--ink);transition:border-color var(--dur-fast)}
+.side-badge:hover{border-color:var(--gold)}
+.side-badge__icon{width:22px;height:22px;border-radius:6px;background:var(--glass);display:flex;align-items:center;justify-content:center;color:var(--gold-600);flex-shrink:0}
+.side-badge__icon .icon{width:13px;height:13px}
+.side-badge__label{writing-mode:vertical-rl;transform:rotate(180deg);font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap}
+@media (max-width:768px){.side-badge{display:none}}
+
+/* Full-screen overlay menu */
+.mkt-overlay{position:fixed;inset:0;z-index:90;pointer-events:none;opacity:0;visibility:hidden;background:var(--bg);transition:opacity .45s var(--ease-out),visibility .45s}
+.mkt-overlay--open{opacity:0.98;visibility:visible;pointer-events:auto}
+.mkt-overlay__inner{position:relative;height:100%;display:flex;flex-direction:column;padding:clamp(18px,3vw,34px) var(--gutter);box-sizing:border-box}
+.mkt-overlay__top{display:flex;align-items:flex-start;justify-content:space-between}
+.mkt-overlay__logo{height:30px;width:auto;display:block;filter:brightness(0) invert(1)}
+.mkt-overlay__close{display:flex;align-items:center;gap:14px;background:transparent;border:none;cursor:pointer;color:var(--paper)}
+.mkt-overlay__close-label{font-size:13px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;opacity:.7}
+.mkt-overlay__close-x{position:relative;width:22px;height:22px;display:block}
+.mkt-overlay__close-x span{position:absolute;top:10px;left:0;height:2px;width:22px;border-radius:2px;background:var(--gold)}
+.mkt-overlay__close-x span:first-child{transform:rotate(45deg)}
+.mkt-overlay__close-x span:last-child{transform:rotate(-45deg)}
+.mkt-overlay__nav{flex:1;display:flex;flex-direction:column;justify-content:center;gap:4px;max-width:900px}
+.mkt-overlay__link{display:flex;align-items:baseline;gap:22px;padding:14px 4px;text-decoration:none;color:var(--paper);opacity:0;transform:translateY(14px);transition:opacity .5s var(--ease-out),transform .5s var(--ease-out);border-bottom:1px solid rgba(250,247,240,0.08)}
+.mkt-overlay--open .mkt-overlay__link{opacity:1;transform:none;transition-delay:calc(var(--i) * 0.05s + .1s)}
+.mkt-overlay__num{font-family:var(--font-display);font-size:13px;color:var(--gold);letter-spacing:.05em}
+.mkt-overlay__label{font-family:var(--font-display);font-size:clamp(28px,6vw,56px);font-weight:600;letter-spacing:-0.02em;transition:color var(--dur-fast)}
+.mkt-overlay__link:hover .mkt-overlay__label{color:var(--teal-300)}
+.mkt-overlay__foot{display:flex;justify-content:space-between;align-items:center;padding-top:18px;color:rgba(250,247,240,0.55);font-size:13px}
+.mkt-overlay__foot a{color:inherit;text-decoration:none}
+.mkt-overlay__foot a:hover{color:var(--paper)}
+.mkt-overlay__foot-links{display:inline-flex;align-items:center;gap:14px}
+.mkt-overlay__foot-icon{display:inline-flex;align-items:center}
+.mkt-overlay__foot-icon .icon-mask{width:16px;height:16px}
+
+/* Hero — cinematic single column: flat #000000 background (no starfield,
+   no noise, no gradient — see prompt/0057 for why the earlier canvas
+   starfield + page-wide grain overlay were removed), "FLUXIO" filled by
+   hero-video.mp4 clipped to the wordmark's letterforms via mask-image (see
+   Landing.jsx for the mask SVG + the canplay/CSS.supports-gated reveal).
+   Deliberately forced dark regardless of the site's own light/dark toggle
+   — this section is always black by design. The local --ink/--muted/
+   --line/--panel overrides below are what let the shared .btn/.btn-outline
+   classes render with correct contrast here without forking new button
+   styles just for this section. MarketingNav compensates separately for
+   sitting on top of this via its own IntersectionObserver-driven --on-dark
+   state. */
+.hero-cinema{
+  position:relative;
+  width:100%;
+  min-height:100svh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:132px var(--gutter) 90px;
+  overflow:hidden;
+  background:#000000;
+  --ink:#ffffff;
+  --muted:rgba(255,255,255,0.66);
+  --line:rgba(255,255,255,0.18);
+  --panel:rgba(255,255,255,0.06);
+  --glass:rgba(255,255,255,0.05);
+}
+/* Was .hero-cinema's own layout directly before an ambient glow orb needed
+   independent scroll-linked motion split out into its own sibling — that
+   orb was removed as a decorative section-background element (prompt/0058),
+   so this is a plain centered column again; z-index:2 kept in case another
+   layered element is ever added above/below it in the stacking order. */
+.hero-cinema__content{position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;gap:22px;text-align:center;width:100%}
+
+/* Reverted from the aspect-ratio box sized around fluxio-wordmark.svg back
+   to the earlier font-rendered treatment — the real logotype looked bad
+   once sized up dominant (per user feedback), so back to shrink-wrapping
+   to the fallback title's own natural size (an inline-flex, not a fixed
+   box) so the video's mask lines up with whatever "FLUXIO" actually
+   renders at, at any viewport width. */
+.hero-cinema__wordmark{position:relative;display:inline-flex;align-items:center;justify-content:center;max-width:94vw;animation:fadeUp .8s var(--ease-out) .3s backwards}
+.hero-cinema__video{
+  position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+  -webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;
+  -webkit-mask-position:center;mask-position:center;
+  -webkit-mask-size:contain;mask-size:contain;
+  opacity:0;transition:opacity .6s var(--ease-out);
+}
+.hero-cinema__wordmark--live .hero-cinema__video{opacity:1}
+/* Fraunces, not var(--font-display)/Onest — a display serif for the one
+   element on the page meant to read as a wordmark/logotype rather than UI
+   text. letter-spacing pulled in tight (-0.055em) for a closer, more
+   connected letterform feel. */
+.hero-cinema__title{margin:0;font-family:'Fraunces',var(--font-display);font-weight:900;font-size:clamp(3.6rem,0.8rem + 17vw,15.5rem);line-height:1;letter-spacing:0.1em;color:#2DD4BF;white-space:nowrap;transition:opacity .4s var(--ease-out)}
+.hero-cinema__wordmark--live .hero-cinema__title{opacity:0}
+
+.hero-cinema__eyebrow-line{position:relative;margin:0;font-size:12px;font-weight:600;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,0.55);animation:fadeUp .8s var(--ease-out) .4s backwards}
+
+.hero-cinema__tagline{position:relative;margin:0;font-size:var(--step-1);font-weight:700;color:rgba(255,255,255,0.88);animation:fadeUp .8s var(--ease-out) .5s backwards}
+.hero-cinema__tagline em{color:var(--teal-300);font-style:italic}
+
+.hero-cinema__actions{position:relative;animation:fadeUp .8s var(--ease-out) .62s backwards}
+
+.hero-cinema__hint{position:absolute;bottom:34px;left:0;right:0;z-index:1;display:flex;justify-content:center;gap:8px;font-size:13px;color:rgba(255,255,255,0.6);letter-spacing:.04em;animation:hintbob 2.6s ease-in-out infinite,fadeUp .8s var(--ease-out) .92s backwards}
+@keyframes fadeUp{0%{opacity:0;transform:translateY(16px)}100%{opacity:1;transform:translateY(0)}}
+@keyframes hintbob{0%,100%{transform:translateY(0);opacity:.7}50%{transform:translateY(6px);opacity:1}}
+
+@media (max-width:640px){
+  .hero-cinema{padding-top:110px}
+  .hero-cinema__content{gap:18px}
+  .hero-cinema__title{font-size:clamp(2.6rem,0.8rem + 18vw,5.8rem);white-space:normal}
+}
+
+/* The old Panel.jsx/PanelVisual.jsx-driven layout (.panel, .panel--visual,
+   every .panel__ prefixed rule, .panel-visual, .browser-mock and its own
+   prefixed rules) that used to back both Vault and Extension is gone as of
+   prompt/0081 — Extension was the last section still using it (Vault left
+   in its own prompt/0072 rebuild), replaced by ExtensionFlow.jsx's own
+   self-contained .ext- prefixed block below. Panel.jsx and PanelVisual.jsx
+   were deleted outright rather than left as dead code, matching this
+   session's own precedent (Starfield.jsx, Step.jsx, the video-mask
+   chain-logos folder experiment). */
+
+/* .cta-panel__inner/__title/__desc (the old two-headline closing section's
+   own CSS) are gone as of prompt/0086 — ClosingCta.jsx replaced that
+   section entirely with .closing-cta* below. .cta-panel__actions is kept
+   — it's shared with the hero's own CTA button row
+   (`cta-panel__actions hero-cinema__actions` in Landing.jsx), not
+   exclusive to the old closing section. */
+.cta-panel__actions{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;margin-top:6px}
+.btn-lg{padding:14px 26px;border-radius:var(--radius-pill);font-size:15px;display:inline-flex;align-items:center;gap:10px}
+.btn-outline{background:transparent;border:1px solid var(--line);color:var(--ink);border-radius:var(--radius-pill)}
+.btn-outline:hover{border-color:var(--gold);color:var(--gold-600)}
+
+/* Section heading (reused above feature grid / steps). Padding is minimal —
+   inside a horizontal-scroll slide, .h-scroll__stack's gap does the spacing. */
+.section-head{max-width:var(--container);margin:0 auto;text-align:center;display:flex;flex-direction:column;align-items:center;gap:12px}
+.section-head .eyebrow{justify-content:center}
+.section-head__title{font-size:clamp(2.2rem,1.3rem + 3.6vw,5rem);font-weight:800;letter-spacing:-0.02em;line-height:1.05;max-width:20ch}
+.section-head__desc{color:var(--muted);max-width:56ch;font-size:var(--step-0)}
+
+/* Section-heading display type, prompt 0127 (replaces the old gold->teal
+   gradient — reasoned there as "not elegant enough" for the desired
+   Phantom-style black/porcelain premium look): a single system shared by
+   every PRIMARY display headline on the page — .section-head__title
+   (Features/How it works/Networks), .closing-cta__title, and, per this
+   prompt's own audit, the two split-layout titles that previously had NO
+   gradient at all (.vault-split__title/.ext-split__title were flat --ink
+   white) — brought into the same system for real page-wide consistency.
+   .faq__title is deliberately NOT included here (see its own rule's
+   comment, further down this file) — it was intentionally demoted to a
+   small, muted context-setter in an earlier prompt, and this gradient
+   sheen would visually re-elevate it against that established hierarchy.
+   A very soft vertical (top-to-bottom, same reasoning as the gradient
+   this replaces — see git history — a multi-line heading bands oddly
+   under a diagonal) ivory->silver sheen, deliberately subtle (both stops
+   are light, close in lightness) so the "premium" read comes from
+   restraint, not saturation. color:var(--ink) is the fallback for
+   browsers without background-clip:text support; the @supports block
+   swaps to transparent so the gradient shows through. */
+.closing-cta__title,.section-head__title,.vault-split__title,.ext-split__title{
+  background:linear-gradient(180deg,var(--paper),var(--heading-silver));
+  -webkit-background-clip:text;
+  background-clip:text;
+  color:var(--ink);
+}
+@supports (background-clip:text) or (-webkit-background-clip:text){
+  .closing-cta__title,.section-head__title,.vault-split__title,.ext-split__title{color:transparent}
+}
+
+/* prompt 0127's original "hemat" accent rule (.heading-accent — one
+   teal-colored word/phrase per headline, "does."/"signature."/"vault,"/
+   "page."/"you.") lived here through Revision 1, which had already
+   folded it into its own independent teal-dominant shimmer rather than a
+   flat color. Revision 2 removed it entirely, per direct user feedback:
+   with every OTHER word now visibly alive too, one word still reading
+   as "the teal one" no longer looked like a deliberate accent, just an
+   inconsistency — every word now shares the exact same single shimmer
+   (painted once on the parent, see below), so there is no color
+   difference between words at all, at rest or mid-sweep. The one
+   surviving special case at the time was Vault's "vault," word, which
+   kept its own separate treatment for a different reason (a contained
+   pulse, not a color) — renamed to .heading-pulse-word and recolored to
+   match. That word-level special case is GONE as of Revision 8 (see
+   #vault .vault-split__title's own comment much further down) — Vault's
+   whole heading now sweeps like every other section here, no surviving
+   per-word exception. */
+
+/* Continuous color sweep, prompt 0127 Revision 1 — round 1's static
+   ivory/silver sheen read as "no animation" once its one-shot entrance
+   finished (real user feedback, a screenshot-only review couldn't have
+   caught this). Layered ON TOP of that same base rather than replacing
+   it: every rule below only adds background-image/-size/-position/
+   animation, so the color values and @supports fallback stay exactly as
+   round 1 left them. (Revision 2 later removed the separate .heading-accent
+   split mentioned in this comment's own original version — see above.)
+   Only background-position/-size are ever animated — no filter, no
+   box-shadow, per the 0077 blur-overshoot lesson AND this file's own
+   documented finding (Networks.jsx, above) that animating `filter` on a
+   background-clip:text-descendant text node renders it genuinely
+   invisible in this engine. background-position/-size are compositor-
+   cheap and carry no such risk.
+   animation-play-state defaults to paused everywhere below — JS
+   (useHeadingSweep.js) is the only thing that ever sets it to running,
+   applied as each element's own inline style, gated on the one-shot
+   entrance having finished AND the heading actually being in the
+   viewport (paused again the instant it scrolls away, so an infinite
+   animation is never spending a single frame on off-screen text).
+   Every gradient's PAUSED resting frame (the position value written here,
+   matching each animation's own `from` keyframe) reads as plain
+   ivory/silver — turning the loop on never causes a visible jump, only a
+   gradual first pass.
+   prefers-reduced-motion is double-gated: useHeadingSweep never even
+   starts its timer/observer for these users (JS-level, see that hook),
+   and the blanket @media rule further down is a CSS-level backstop in
+   case anything ever slips past that.
+   Revision 5 replaced this whole background-position/-size travel
+   mechanism with Vault's own proven stop-percentage-interpolation
+   technique (see fx-breathe-accent below) — a real, measured defect in
+   the old mechanism (see the "kurang keliatan" root-cause writeup in
+   prompt/0127's own Revision 5 section), fixed correctly for the
+   contrast problem, but at a real cost never surfaced until manual
+   testing on the user's own Chrome: the fix relies on the browser
+   INTERPOLATING two structurally-matching but differently-valued
+   background-image gradients smoothly across a keyframe animation — a
+   real but comparatively less battle-tested CSS capability (distinct
+   from, but in the same general risk family as, animating an
+   unregistered custom property, which never smoothly interpolates and
+   instead flips discretely at each keyframe boundary). Confirmed via a
+   real bug report with screenshots from the user's own Windows Chrome:
+   every swept heading was frozen, each stuck at a different static
+   position — consistent with exactly that discrete-flip failure mode
+   (this headless environment's own Chromium build did interpolate this
+   correctly during Revision 5's own verification, which is precisely
+   why the bug went undetected here — a genuine environment/version
+   difference, not a fabricated risk).
+   Revision 6 reverted to the plain background-position keyframe
+   mechanism (fx-sweep-h/-h-rev/-diag/-v, unchanged in form from
+   Revisions 1-4, which real users' own Chrome had already run correctly
+   for months across those four revisions) while keeping the ONE real
+   lesson Revision 5 uncovered: the reason the old mechanism read as
+   "kurang keliatan" wasn't the mechanism itself, it was background-size
+   being too SMALL relative to the colored zone's own width, making the
+   zone visible for most of the cycle instead of briefly. background-size
+   is now 600% (up from 260%) — at this size the box's own visible window
+   into the gradient is only ~16.7% of the gradient's own span (100/600),
+   comparable to the 16-point colored zone's own width instead of more
+   than double it, so the zone is genuinely off-screen (pure dim) for the
+   large majority of the cycle and passes briefly through center instead
+   of loitering. will-change/transform:translateZ(0) (Revision 5's own
+   speculative jank mitigation, never proven to help and never ruled out
+   as a contributor to this exact freeze) were dropped along with the
+   stop-interpolation technique — the plain, unpromoted background-
+   position animation is the one configuration with a genuine multi-
+   revision track record of working on real hardware. */
+@keyframes fx-sweep-h{from{background-position:0% 50%}to{background-position:100% 50%}}
+@keyframes fx-sweep-h-rev{from{background-position:100% 50%}to{background-position:0% 50%}}
+@keyframes fx-sweep-diag{from{background-position:0% 0%}to{background-position:100% 100%}}
+@keyframes fx-sweep-v{from{background-position:50% 0%}to{background-position:50% 100%}}
+/* Revision 8 (prompt/0127): Vault's own per-word pulse is GONE — no more
+   fx-breathe-accent (Revision 5's stop-percentage interpolation, proven
+   frozen on real Chrome) and no more fx-pulse-glow (Revision 7's opacity
+   rebuild, reported by the user as STILL frozen despite opacity being
+   about as battle-tested an animatable property exists). Two things
+   drove this: the opacity fix genuinely didn't work either, and the
+   user's real expectation had never actually been "one word breathes" —
+   it was "the whole heading sweeps, like every other section." Rather
+   than chase a third pulse mechanism, Vault's whole title now runs the
+   SAME background-position sweep as Features/How-it-works/Extension/
+   Closing-CTA (see #vault .vault-split__title below) — the one
+   mechanism with an unbroken multi-revision real-Chrome track record in
+   this entire file. See that rule's own comment for the chosen
+   direction and a hedged investigation note on why opacity likely still
+   froze.
+   Cheap, UNCONFIRMED guess for the record (explicitly not the fix this
+   revision relies on): the frozen opacity span was a plain, non-motion
+   child nested inside a <motion.h2> whose OWN opacity/rotateX are
+   continuously recalculated every scroll frame via Framer Motion's
+   direct-DOM-mutation path (bypassing React re-renders by design). It's
+   plausible some browser builds throttle or otherwise interfere with a
+   descendant's independently-running CSS @keyframes timeline while an
+   ancestor is under that kind of constant, off-React style mutation —
+   the same general "less battle-tested interaction" category as the
+   gradient-interpolation bug, just for a different property this time.
+   Never reproduced or root-caused here; recorded only because the user
+   asked for it, not used to justify any decision above. */
+
+/* The shimmer band itself: a dim neutral-grey base, a brief bright-white
+   glint, back to base. Reused verbatim by every directional section
+   below; only the gradient ANGLE and the animation/background-size
+   differ per direction.
+   Revision 1 had a brief var(--teal-300) touch at the peak of this
+   glint (a deliberate "the old accent color just passes through the
+   motion instead of sitting still" compromise). Revision 2 removed it,
+   tested side by side on Features specifically (rendered both, compared
+   frames): the teal version still reads as "a word briefly turns a
+   different color", exactly what this revision's own brief is asking to
+   eliminate — a pure white glint carries the same sense of motion/depth
+   with zero hue shift, ever, matching "satu warna putih/ivory" literally
+   rather than "usually". Applied consistently to every section that
+   shares this recipe, including Networks' own independent per-segment
+   copy below (never shared this literal rule, but used to include the
+   same teal stop).
+   Revision 4 replaced the base stops' --paper/--heading-silver with the
+   new --heading-dim (see its own :root comment for the luminance math
+   and the moderate-vs-strong render comparison that picked it) — real
+   user feedback that the sweep was "barely visible, shimmer and base
+   read as almost the same tone" against the old --paper base, which sat
+   only ~3 luminance points below the glint's pure white.
+   Revision 5 replaced the pure-white glint with the page's own existing
+   brand teal — user feedback shifted from "no hue" to explicitly wanting
+   the sweep colored like the Fluxio logo, and reported the white version
+   was STILL not visible enough. Sampled the actual logo PNG's pixels
+   directly (not guessed): its dominant color is #2dd4bf, which matches
+   neither existing --teal (#6fb3a8) nor --teal-300 (#a9dbd3) exactly —
+   this codebase's brand mark uses a more saturated teal than either CSS
+   token. Per the explicit "don't invent a new teal" constraint, reused
+   the two EXISTING tokens together instead of adding a third: --teal-300
+   at the very peak (79.7% luminance — brighter than --heading-dim's
+   71.3%, preserving Revision 4's brightness-contrast logic) flanked by
+   --teal on both sides (61.8% luminance, darker than the base but far
+   more saturated — this is what makes the band read as unmistakably
+   "teal", not just "a slightly different shade of pale"), the same
+   two-stop pairing this file's own hero tagline (.hero-cinema__tagline
+   em) and Vault's original pre-Revision-2 pulse already established as
+   this page's "bright accent inside a body color" pattern. Widened the
+   colored zone from 16 points (44-60%) to 24 points (38-62%) of the
+   gradient's own span so the teal band has more on-screen dwell time
+   per pass — directly answering "masih kurang keliatan" a second time
+   with a second, different lever (color + dwell time) since the first
+   lever (base/peak luminance gap alone) wasn't sufficient on its own.
+   Smoothness (Revision 5's other complaint, "patah-patah"): diagnosed
+   BEFORE touching color — see prompt/0127's own Revision 5 write-up for
+   the full investigation (the "per-word" hypothesis was falsified by
+   direct evidence; real intermittent paint stalls up to ~270ms WERE
+   found via CDP screencast frame-timing, unrelated to word boundaries
+   or the animation's own loop restart).
+   Revision 6: the Revision 5 stop-percentage mechanism (see fx-sweep-h
+   etc.'s own comment above) turned out to freeze solid on the user's
+   real Chrome — reverted back to this plain background-position
+   mechanism, kept Revision 5's real lesson (a much larger
+   background-size, so the colored zone genuinely reads as off-screen
+   for most of the cycle instead of loitering) — see that comment for
+   the full reasoning. background-size:600% (up from 260%) shrinks the
+   box's own visible window to ~16.7% of the gradient's own span,
+   comparable to the 16-point colored zone instead of more than double
+   it. will-change/transform:translateZ(0) dropped along with the
+   technique they were added to hedge for. */
+#features .section-head__title,
+#how-it-works .section-head__title,
+#extension .ext-split__title,
+#get-started .closing-cta__title,
+#vault .vault-split__title{
+  background-size:600% 100%;
+  animation-duration:7s;
+  animation-timing-function:linear;
+  animation-iteration-count:infinite;
+  animation-play-state:paused;
+}
+#features .section-head__title{
+  /* background-position travel range (0%->100%, NOT -60%/160% as in
+     Revisions 1-4) was mapped empirically for THIS 600%-size gradient,
+     not assumed carried over from the old 260%-size math — the
+     relationship between a position value and what's actually visible
+     depends on background-size in a way that resisted manual
+     re-derivation (twice, in this same revision — see the position
+     formula's own real-world behavior not matching two separate manual
+     calculations). Mapped instead by testing 20+ explicit position
+     values directly and reading real per-pixel teal counts: 0-10% and
+     90-100% both read as genuinely all-dim, 30-70% clearly shows the
+     teal zone with clean ramps in between — one full, single-pass
+     dim->teal->dim cycle across exactly this range.
+     Re-tested the same way against the diagonal (520%, 115deg) and
+     vertical (370%, 180deg) cases below and found the identical shape
+     (dim at 0%, peak 30-70%, dim at 100%) despite the different sizes
+     and angles — 0%->100% is the CSS position formula's own definition
+     of "one full edge-to-edge traverse of the oversized background",
+     independent of background-size, so it was never a per-section
+     constant to re-derive in the first place. The diagonal/vertical
+     keyframes' old -40%/140% and 50%/-35%->135% values were leftover
+     from Revision 1-era math against a much smaller background-size and
+     had never been re-verified after Revision 5/6 grew that size — this
+     is the same class of bug Features itself had, just not yet caught
+     there. Fixed below the same way, by direct pixel-count testing.
+     Color composition ("putih-abu-teal", prompt/0127 Revision 9, WIDTH
+     revised Revision 10) — real user feedback that the previous
+     --heading-dim-based recipe let the teal band swallow the ENTIRE
+     heading at its peak (most visible on Vault's shorter title, but
+     present everywhere): the base moved to bright --paper/--heading-
+     silver (the same pairing the page's own plain, non-swept titles have
+     always used — see the shared static rule above) and has stayed there
+     since — that part of Revision 9's fix was a clear win and was never
+     revisited. 7 stops, not 5: paper -> silver (a visible "abu muda"
+     transition step, not a hard cut) -> teal -> teal-300 (peak) -> teal
+     -> silver -> paper.
+     The ZONE WIDTH went through two rounds of measurement, not one.
+     Revision 9 narrowed it dramatically (to a 2-point pure-teal span
+     with 3-point silver flanks) against an explicit "peak coverage must
+     not exceed ~1/3 of the heading" ceiling, verified at 21.8-23.4% peak
+     coverage across all six sections. Revision 10 is a direct user
+     reversal of that ceiling after comparing renders side by side: the
+     WIDE band from Revision 8 (before this file even had a bright base)
+     was the preferred FEEL, and Revision 9's narrow band read as too
+     restrained once combined with the brighter base — the user's own
+     explicit new target is ~35-40% peak coverage, no ceiling.
+     Two candidates were rendered and measured against that new target
+     before picking one: a plain 8-point pure-teal span with NO silver
+     flanks (paper 0%, teal 46%, teal-300 50%, teal 54%, paper 100%) —
+     this measured 54-56% peak on Features, well past even the new,
+     wider target, because removing the silver flanks entirely (rather
+     than just shrinking them) lets the paper-to-teal transition itself
+     span a wider effective portion of the visible window; and a
+     4-point pure-teal span with 4-point silver flanks (44/48/50/52/56%,
+     shipped here) — this measured 37.4-40.0% peak on Features, landing
+     precisely inside the requested ~35-40% window. Chosen for hitting
+     the actual numeric target, confirmed by rendering both side by side
+     first (the 8-point version visibly reads as the whole heading
+     dipped in teal at peak; this one reads as a clear, generous band
+     passing through, matching the user's own "tercelup" description
+     without exceeding it). Note for the record: an earlier version of
+     this comment (Revision 9) mis-stated that the ORIGINAL --heading-
+     dim-based 8-point zone had itself been measured at 38.3% peak —
+     that number actually came from testing this same 12-point/silver-
+     flank shape with a --paper base, not from re-measuring the old
+     --heading-dim zone under identical methodology; corrected here
+     rather than left compounding, though the old zone/token are gone
+     either way and the point is moot for anything currently shipped.
+     Applied identically to all six sections below — only each one's own
+     angle changes, per every revision's own "arah/durasi TIDAK berubah"
+     scope. */
+  background-image:linear-gradient(90deg,var(--paper) 0%,var(--heading-silver) 44%,var(--teal) 48%,var(--teal-300) 50%,var(--teal) 52%,var(--heading-silver) 56%,var(--paper) 100%);
+  background-position:0% 50%;
+  animation-name:fx-sweep-h;
+}
+#how-it-works .section-head__title{
+  /* Descender fix (prompt 0128 Revision 3) — "signature."'s own "g" was
+     reported cropped flat at the bottom. Root-caused empirically, not
+     assumed: background-clip:text clips the gradient fill to the
+     element's own content-box height (from line-height), and this
+     title's tight line-height (1.05, inherited from the shared
+     .section-head__title rule) doesn't leave room for the font's actual
+     descender ink at font-weight:800 — confirmed by adding padding-
+     bottom alone (zero clip-path/overflow:hidden involved on this
+     element itself) and watching the "g"'s bowl go from a flat-cut edge
+     to its full round shape. 0.18em (an em value, so it tracks this
+     title's own clamp()-driven responsive font-size automatically,
+     instead of a fixed px tuned to one viewport) was the minimal amount
+     that fully uncrops the descender, verified via a tight zoomed
+     before/after crop of the exact glyph. The matching negative
+     margin-bottom cancels the added box height back out for LAYOUT
+     purposes only (confirmed via getBoundingClientRect on the cards
+     below: their own top position is byte-identical before/after) —
+     padding creates room inside the box for the glyph to paint into,
+     margin keeps that extra room from pushing anything below it down,
+     so the fix is invisible except for the descender itself now
+     rendering correctly. */
+  padding-bottom:0.18em;
+  margin-bottom:-0.18em;
+  background-image:linear-gradient(115deg,var(--paper) 0%,var(--heading-silver) 44%,var(--teal) 48%,var(--teal-300) 50%,var(--teal) 52%,var(--heading-silver) 56%,var(--paper) 100%);
+  background-size:520% 520%;
+  background-position:0% 0%;
+  animation-name:fx-sweep-diag;
+  animation-duration:7.5s;
+}
+#extension .ext-split__title{
+  /* Descender fix (prompt 0128 Revision 3) — same root cause as
+     #how-it-works .section-head__title's own comment below (background-
+     clip:text clipping to a line-height-derived box too tight for this
+     font/weight's real descender ink) — reported here as "Your"/"keys"'
+     "y" and "page"'s "g" all cropped flat. Proven independent of any
+     entrance mechanism specifically on this element: this title has
+     NEITHER clip-path NOR overflow:hidden anywhere in its own ancestor
+     chain (confirmed via computed-style inspection up to the pin root),
+     yet still clipped — so this is not an artifact of the horizontal-
+     slide entrance, it's the same universal background-clip:text
+     interaction. Same 0.18em padding-bottom/margin-bottom pairing as
+     that section, for the same reasons (em scales with this title's own
+     responsive font-size; the negative margin cancels the added box
+     height so .ext-split__desc below sits at the exact same position as
+     before, confirmed via getBoundingClientRect). */
+  padding-bottom:0.18em;
+  margin-bottom:-0.18em;
+  /* Vertical case needs its own size again (same reasoning Revision 1
+     first found: a background this oversized relative to a SHORT 2-line
+     box would spend most of the cycle traveling through empty margin
+     above/below the actual glyphs). Sized down proportionally from the
+     shared 600% the same way Revision 1's own 160%-vs-260% ratio was
+     — smaller than the horizontal sections' but still large enough for
+     a real off-screen dim majority. background-position:50% Y% (not
+     Y% 50%) because background-size is 100% on the X axis — there's no
+     horizontal offset room at all, so X is pinned at 50% purely for
+     clarity and only Y sweeps 0%->100% (verified empirically, same
+     universal shape as Features/How-it-works above). */
+  background-image:linear-gradient(180deg,var(--paper) 0%,var(--heading-silver) 44%,var(--teal) 48%,var(--teal-300) 50%,var(--teal) 52%,var(--heading-silver) 56%,var(--paper) 100%);
+  background-size:100% 370%;
+  background-position:50% 0%;
+  animation-name:fx-sweep-v;
+}
+#get-started .closing-cta__title{
+  /* Descender fix (prompt 0128 Revision 3) — same root cause as
+     #how-it-works/#extension's own comments above ("by"/"you."'s "y"
+     was reported cropped). This section's own per-word entrance
+     (motion.span opacity/y fade, no clip-path/overflow either) rules
+     out the entrance mechanism here too, same as #extension — it's the
+     shared background-clip:text-vs-line-height interaction, universal
+     to this whole title-treatment family, not specific to any one
+     section's own motion technique. Same 0.18em pairing, same reasoning
+     (em tracks this title's own larger clamp()-driven font-size;
+     negative margin-bottom keeps .closing-cta__desc below at its exact
+     prior position, confirmed via getBoundingClientRect). */
+  padding-bottom:0.18em;
+  margin-bottom:-0.18em;
+  background-image:linear-gradient(90deg,var(--paper) 0%,var(--heading-silver) 44%,var(--teal) 48%,var(--teal-300) 50%,var(--teal) 52%,var(--heading-silver) 56%,var(--paper) 100%);
+  background-position:100% 50%;
+  animation-name:fx-sweep-h-rev;
+  animation-duration:8s;
+}
+
+/* Vault — Revision 8 (prompt/0127) retired the whole "non-directional
+   pulse" idea (see fx-pulse-glow's own comment above for the two prior
+   attempts and why both froze on real Chrome) and joined this heading to
+   the exact same directional-sweep family as Features/How-it-
+   works/Extension/Closing-CTA, via the shared selector block above.
+   Direction: reused fx-sweep-diag (the keyframe only moves
+   background-position — 0%,0% to 100%,100%, the Revision 6 universal
+   rule — it carries no opinion about the gradient's own angle) but with
+   a mirrored angle from How-it-works' own 115deg: 245deg is that same
+   diagonal reflected across the vertical axis (dir(115°)=(0.906,0.423),
+   dir(245°)=(-0.906,0.423) — same downward lean, opposite horizontal
+   lean), so this reads as a clearly different corner-to-corner sweep
+   next to How-it-works' rather than a coincidentally similar one. Size
+   (520% 520%) matches How-it-works' own — both are two-line headings of
+   comparable scale in a similar split-layout column, and the universal
+   0%->100% rule is independent of background-size anyway (confirmed
+   across three different sizes/angles already in Revision 6), so there
+   was nothing new to re-derive here, per this revision's own explicit
+   "don't hand-calculate, reuse the proven rule" instruction — re-tested
+   by render afterward anyway, not just assumed. */
+#vault .vault-split__title{
+  background-image:linear-gradient(245deg,var(--paper) 0%,var(--heading-silver) 44%,var(--teal) 48%,var(--teal-300) 50%,var(--teal) 52%,var(--heading-silver) 56%,var(--paper) 100%);
+  background-size:520% 520%;
+  background-position:0% 0%;
+  animation-name:fx-sweep-diag;
+}
+
+/* Networks — the one per-SEGMENT member: each chain name carries its own
+   independent copy of the shimmer (own background-clip:text, own
+   animation), staggered via animation-delay (set inline per-index in
+   Networks.jsx) so the highlight visibly visits Solana, then Ethereum,
+   then BNB, then Base in turn, looping — "cahaya berpindah antar nama".
+   Never `filter` (see this file's own documented bug above) — the same
+   background-position sweep used everywhere else here (fx-sweep-h,
+   reverted to in Revision 6 after the Revision 5 stop-percentage
+   technique froze on real Chrome — see that keyframe's own comment). */
+.networks-heading-segment{
+  background-image:linear-gradient(90deg,var(--paper) 0%,var(--heading-silver) 44%,var(--teal) 48%,var(--teal-300) 50%,var(--teal) 52%,var(--heading-silver) 56%,var(--paper) 100%);
+  background-size:600% 100%;
+  background-position:0% 50%;
+  -webkit-background-clip:text;
+  background-clip:text;
+  color:var(--ink);
+  animation:fx-sweep-h 4.8s linear infinite;
+  animation-play-state:paused;
+}
+@supports (background-clip:text) or (-webkit-background-clip:text){
+  .networks-heading-segment{color:transparent}
+}
+
+@media (prefers-reduced-motion:reduce){
+  .section-head__title,.closing-cta__title,.vault-split__title,.ext-split__title,.networks-heading-segment{
+    animation:none!important;
+  }
+}
+
+/* Closing CTA — the page's last word before the footer (ClosingCta.jsx,
+   prompt/0086), merged from two previously-stacked, competing closing
+   blocks (an eyebrow+headline+badge-row, then a second
+   eyebrow+headline+desc+CTA) into one message with a real hierarchy: a
+   quiet badge row leads in small, then eyebrow -> headline -> supporting
+   line -> CTA, sized to read as one deliberate close rather than two
+   headlines fighting for attention. */
+.closing-cta{position:relative;display:flex;flex-direction:column;align-items:center;gap:18px;text-align:center;width:100%;max-width:var(--container);margin:0 auto}
+.closing-cta>*{position:relative}
+/* Small and quiet on purpose — this leads into the eyebrow/headline
+   below, not competing with them. Reuses .badge-row/.badge-pill as-is
+   (same look as the extension-facts row elsewhere on the page), just a
+   tighter top margin via this wrapper instead of that shared class's own
+   spacing rules. */
+.closing-cta__badges{margin-bottom:-4px}
+.closing-cta__title{font-size:clamp(2.4rem,1.4rem + 3.4vw,5.4rem);font-weight:800;max-width:20ch;letter-spacing:-0.02em;line-height:1.04;margin:0}
+/* display:inline-block (not the default inline) so each word's own
+   whileInView y-offset animates as a whole unit instead of the browser
+   trying to animate individual line-wrapped fragments of an inline
+   element. A trailing space is part of the word's own text content (see
+   ClosingCta.jsx), not CSS margin — keeps wrapping natural. */
+.closing-cta__word{display:inline-block}
+/* Features heading's own per-word spans (prompt 0127, Landing.jsx) — same
+   inline-block treatment as .closing-cta__word above, so each word's own
+   whileInView y-offset animates as a whole unit. */
+.section-head__word{display:inline-block}
+/* Networks heading's own per-chain-name segments (prompt 0127) — same
+   inline-block reasoning, needed here so each segment's x-slide + blur
+   filter renders as one coherent unit instead of an inline text run. */
+.networks-heading-segment{display:inline-block}
+
+/* Animated gradient-outline stroke on the Features headline (prompt 0127
+   Revision 3) was built, then REMOVED entirely in Revision 4 after a
+   second real-environment rendering failure (this time on the user's
+   actual Windows Chrome, not just headless) with no root cause pinned
+   down despite extensive isolated/pixel-sampled testing of both the
+   original negative-z-index design AND its inverted-layer replacement
+   -- both worked in every test harness built to verify them and both
+   failed on a real page. The user decided to cut losses rather than
+   pursue a third CSS-layering variant or migrate to SVG <text>. See
+   prompt/0127's own Revision 3 AND Revision 4 write-ups for the full
+   investigation and cancellation reasoning -- kept there as real
+   history, not reproduced here now that the code itself is gone.
+   .heading-outline-word and its ::before rule, and the
+   --heading-outline-play custom property in Landing.jsx, no longer
+   exist anywhere in this codebase. */
+
+.closing-cta__desc{color:var(--muted);max-width:52ch;font-size:var(--step-0);margin:0}
+.closing-cta__actions{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;margin-top:6px}
+
+@media (max-width:640px){
+  .closing-cta__badges{margin-bottom:0}
+}
+
+/* Chain badge row */
+.chain-row{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
+.chain-badge{display:flex;flex-shrink:0;align-items:center;gap:8px;padding:7px 16px 7px 7px;border-radius:var(--radius-pill);background:var(--panel);border:1px solid var(--line);font-size:13px;font-weight:600;white-space:nowrap;transition:transform var(--dur-fast),border-color var(--dur-fast)}
+.chain-badge:hover{transform:translateY(-2px);border-color:var(--gold)}
+.chain-badge img{width:22px;height:22px;min-width:22px;border-radius:50%;display:block;object-fit:cover}
+
+/* Marquee — two independent rows of pill chips moving opposite directions
+   (Marquee.jsx, prompt/0087), styled as a dark-mode take on
+   irisventure.com's own light-pill marquee: their white capsule on a
+   light page flips to a barely-there dark capsule here
+   (rgba(255,255,255,0.04) fill, var(--line) border) rather than a literal
+   white pill, which would fight the page's own #000000 background this
+   whole session has kept deliberately pure (prompt/0057). Sits between
+   ClosingCta and the footer now (moved from between HowItWorks/Networks)
+   — the outer .marquee keeps its own border-top/border-bottom + padding
+   exactly as before, which is what frames it as a clean transition strip
+   into the footer regardless of what's above it. */
+.marquee{display:flex;flex-direction:column;gap:16px;overflow:hidden;position:relative;padding:26px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);-webkit-mask-image:linear-gradient(90deg,transparent,#000 8%,#000 92%,transparent);mask-image:linear-gradient(90deg,transparent,#000 8%,#000 92%,transparent)}
+.marquee__row{display:flex;overflow:hidden}
+.marquee__track{display:flex;flex-shrink:0;gap:14px;width:max-content}
+/* Left/right refers to each row's own travel direction, not a fixed
+   position — row 1 (top) moves left via the existing 0 -> -50% keyframe;
+   row 2 (bottom) moves right via the same keyframe run in reverse
+   (-50% -> 0), rather than a second, mirrored keyframe — one duplicated-
+   track loop technique serves both directions. Durations deliberately
+   differ (40s/48s) so the two rows never read as mechanically synced. */
+.marquee__row--left .marquee__track{animation:marquee 40s linear infinite}
+.marquee__row--right .marquee__track{animation:marquee-reverse 48s linear infinite}
+/* Track keeps scrolling under the cursor now (prompt/0088) — the old
+   .marquee__row:hover pause-on-hover rule is gone entirely, per the
+   prompt's own instruction. Hover no longer stops anything moving; it
+   only changes which single pill's media is lit up as it drifts past. */
+.marquee__item{display:inline-flex;align-items:center;gap:8px;white-space:nowrap;font-family:var(--font-display);font-weight:600;font-size:14px;color:var(--muted);padding:9px 18px;border-radius:var(--radius-pill);background:rgba(255,255,255,0.04);border:1px solid var(--line);transition:color .3s var(--ease-out),border-color .3s var(--ease-out)}
+/* Border/text firm up slightly on hover — deliberately no transform/scale
+   here (the prompt's own "tanpa animasi berlebihan"), unlike the old
+   single-row version's scale(1.06) hover. */
+.marquee__item:hover{color:var(--ink);border-color:var(--gold)}
+/* Grayscale-by-default, full color only on the pill it belongs to being
+   hovered (prompt/0088) — applies uniformly to both PNG logos and generic
+   Icon.jsx SVGs (filter:grayscale works on rendered pixels regardless of
+   how the color was produced, so a `color:var(--gold-600)` SVG desaturates
+   the same as a colorful PNG). height is the shared constraint (not
+   width) so every logo reads at the same visual scale in the pill
+   regardless of its own native aspect ratio — a wide mark like
+   WalletConnect's just ends up narrower than a square one at the same
+   height, never taller, so no pill gets pushed out of shape by it. */
+.marquee__item-media{height:18px;width:auto;max-width:64px;object-fit:contain;opacity:0.6;filter:grayscale(1);transition:filter .3s ease,opacity .3s ease}
+.marquee__item:hover .marquee__item-media{opacity:1;filter:none}
+svg.marquee__item-media{color:var(--gold-600)}
+/* Jupiter only (see Marquee.jsx's own boostDefault comment) — its badge
+   is dark navy; without this it reads as nearly invisible at 0.6 opacity
+   grayscale against this strip's own near-black pill background. */
+.marquee__item img.marquee__item-media--boost{filter:grayscale(1) brightness(1.45)}
+.marquee__item:hover img.marquee__item-media--boost{filter:none}
+@keyframes marquee{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+@keyframes marquee-reverse{from{transform:translateX(-50%)}to{transform:translateX(0)}}
+/* Animation itself still stops under reduced motion, same as before —
+   only the hover color reveal (a plain CSS transition, not a motion
+   effect this rule ever touched) stays active, per the prompt's own
+   "efek hover warna boleh tetap aktif". */
+@media (prefers-reduced-motion:reduce){
+  .marquee__row--left .marquee__track,.marquee__row--right .marquee__track{animation:none}
+}
+@media (max-width:640px){
+  .marquee{gap:12px}
+  .marquee__track{gap:10px}
+  .marquee__item{font-size:12.5px;padding:7px 14px;gap:6px}
+  .marquee__item-media{height:16px;max-width:52px}
+}
+
+/* Feature showcase — replaces the old flat-color bento grid (see
+   FeatureShowcase.jsx for why: two of its six card colors broke down in
+   dark theme). Surfaces are always var(--panel)/var(--line)/var(--ink) —
+   already theme-aware — and color only ever shows up as a small accent,
+   alternating the site's two existing brand colors (gold, teal). A
+   clickable, auto-advancing list on the left; the selected feature's full
+   detail crossfades into a stage on the right. */
+.showcase{display:flex;flex-direction:column;gap:24px;width:100%;max-width:var(--container)}
+
+/* Horizontal numbered pill tabs — replaced the old vertical icon+title+
+   progress-bar list so switching "which feature" reads as picking a
+   category, not scanning a menu. Same active/auto-advance state machine
+   in FeatureShowcase.jsx as before, just a different button shape. */
+.showcase__tabs{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
+.showcase__tab{display:inline-flex;align-items:center;gap:8px;padding:10px 18px;border-radius:var(--radius-pill);border:1px solid var(--line);background:var(--panel);color:var(--muted);font-family:var(--font-body);font-weight:600;font-size:13.5px;cursor:pointer;transition:background .3s var(--ease-out),color .3s var(--ease-out),border-color .3s var(--ease-out)}
+.showcase__tab:hover{border-color:var(--gold);color:var(--ink)}
+.showcase__tab-num{font-family:var(--font-display);font-size:11px;font-weight:700;opacity:.6}
+.showcase__tab--active{color:var(--ink)}
+.showcase__tab--active.showcase__tab--gold{background:rgba(219,176,87,0.18);border-color:var(--gold)}
+.showcase__tab--active.showcase__tab--teal{background:rgba(111,179,168,0.2);border-color:var(--teal)}
+
+.showcase__stage{position:relative;border-radius:28px;border:1px solid var(--line);background:var(--panel);padding:clamp(24px,4vw,40px);overflow:hidden;min-height:320px;box-shadow:inset 0 0 42px rgba(219,176,87,0.06)}
+.showcase__stage::before{content:"";position:absolute;top:-40%;right:-15%;width:55%;height:170%;border-radius:50%;background:var(--stage-glow,var(--gold));opacity:.14;filter:blur(70px);pointer-events:none;transition:background .5s var(--ease-out)}
+
+/* Premium animated border ring — a conic gradient (gold -> transparent ->
+   teal -> transparent -> gold) masked down to a hairline band via the
+   padding + mask-composite:exclude technique, slowly rotated by animating
+   the typed --border-angle custom property (registered via @property so
+   the angle itself is interpolable, not just crossfaded). Sits on ::after
+   (::before is already the radial glow above) at inset:0 — the ring is
+   drawn *inward* via its own padding, so it never needs to escape the
+   stage's overflow:hidden. */
+@property --border-angle{
+  syntax:'<angle>';
+  inherits:false;
+  initial-value:0deg;
+}
+.showcase__stage::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  border-radius:inherit;
+  padding:1.5px;
+  background:conic-gradient(from var(--border-angle),
+    rgba(219,176,87,0) 0deg,
+    var(--gold) 35deg,
+    rgba(219,176,87,0) 100deg,
+    rgba(111,179,168,0) 160deg,
+    var(--teal) 205deg,
+    rgba(111,179,168,0) 270deg,
+    var(--gold) 330deg,
+    rgba(219,176,87,0) 360deg);
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;
+  mask-composite:exclude;
+  pointer-events:none;
+  animation:showcase-border-spin 13s linear infinite;
+}
+@keyframes showcase-border-spin{to{--border-angle:360deg}}
+@media (prefers-reduced-motion:reduce){.showcase__stage::after{animation:none;--border-angle:35deg}}
+
+/* Two-column detail — label/headline/paragraph on the left, the live node
+   diagram on the right (see NodeDiagram.jsx). */
+.showcase__panel{position:relative;display:grid;grid-template-columns:1fr 1fr;gap:clamp(20px,3vw,40px);align-items:center;width:100%}
+.showcase__panel-copy{display:flex;flex-direction:column;align-items:flex-start;gap:12px;text-align:left}
+.showcase__panel-label{font-family:var(--font-display);font-size:12px;font-weight:600;letter-spacing:.22em;text-transform:uppercase;color:var(--muted)}
+.showcase__panel-icon{width:60px;height:60px;border-radius:18px;display:flex;align-items:center;justify-content:center}
+.showcase__panel-icon .icon{width:28px;height:28px}
+.showcase__panel--gold .showcase__panel-icon{background:rgba(219,176,87,0.16);color:var(--gold-600)}
+.showcase__panel--teal .showcase__panel-icon{background:rgba(111,179,168,0.18);color:var(--teal)}
+.showcase__panel-title{font-size:var(--step-2);font-weight:600;letter-spacing:-0.02em;margin:0}
+.showcase__panel-desc{color:var(--muted);font-size:var(--step-0);line-height:1.6;max-width:42ch;margin:0}
+
+.showcase__panel-diagram{display:flex;flex-direction:column;align-items:center;gap:10px}
+.showcase__panel-caption{margin:0;font-size:12px;color:var(--muted);text-align:center}
+
+/* .feature-visual is the generic sizing box every Features-tab visual
+   shares (width/max-width/overflow); .node-diagram adds aspect-ratio:1 on
+   top of it since it alone is drawn on a square viewBox — the other four
+   visuals (SeedBlocks/GatedRequest/ApprovalPipeline/ContainedData) stay on
+   .feature-visual only and rely on their own non-square viewBox for
+   intrinsic proportions, so forcing 1:1 here would squash them. */
+.feature-visual{width:100%;max-width:280px;overflow:visible}
+.node-diagram{width:100%;max-width:280px;aspect-ratio:1;overflow:visible}
+.node-diagram__line{stroke-width:1.5;opacity:.5}
+.node-diagram__core{filter:drop-shadow(0 0 6px currentColor)}
+.node-diagram__core-pulse{fill:none;stroke-width:1.5}
+.node-diagram__node{stroke:var(--panel);stroke-width:2}
+.node-diagram__label{font-family:var(--font-body);font-size:9.5px;font-weight:600;fill:var(--muted)}
+
+/* SeedBlocks (BIP-39) — a grid of abstract word-chip rectangles that fill
+   in one at a time (see SeedBlocks.jsx), ending in a small "checksum
+   verified" pill. */
+.seed-blocks{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;width:100%}
+.seed-blocks__chip{height:32px;border-radius:8px;border:1px solid;background:var(--glass);display:flex;align-items:center;justify-content:center;overflow:hidden}
+.seed-blocks__dash{display:block;width:55%;height:3px;border-radius:2px;transform-origin:left center}
+.seed-blocks__checksum{display:inline-flex;align-items:center;gap:8px;align-self:center;margin-top:14px;padding:7px 16px;border-radius:var(--radius-pill);border:1px solid;font-family:var(--font-body);font-size:11.5px;font-weight:600}
+.seed-blocks__checksum-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+
+/* GatedRequest (origin-checked extension) — webpage -> gate -> wallet core,
+   see GatedRequest.jsx. */
+.gated-request__node{fill:var(--panel);stroke-width:1.5}
+.gated-request__gate{fill:none;stroke-width:1.5}
+.gated-request__scan{stroke-width:1.5;opacity:.85}
+.gated-request__core{filter:drop-shadow(0 0 6px currentColor)}
+
+/* ContainedData (nothing leaves your device) — a dashed device boundary
+   with orbiting particles, and a separate, deliberately muted "server"
+   glyph outside it with a blocked connection (see ContainedData.jsx). */
+.contained-data__boundary{fill:none;stroke-width:1.5;opacity:.6}
+.contained-data__blocked-line{stroke:var(--muted);stroke-width:1.5;stroke-dasharray:3 4;opacity:.4}
+.contained-data__x{stroke:var(--muted);stroke-width:1.5;opacity:.5}
+.contained-data__server{fill:var(--muted);opacity:.3}
+
+@media (max-width:900px){
+  .showcase__panel{grid-template-columns:1fr}
+  .showcase__panel-copy{align-items:center;text-align:center}
+}
+
+/* Features section only — fit one desktop viewport with no internal
+   scroll, pills in a single row. .h-scroll__slide, .h-scroll__stack,
+   .section-head__title and .showcase (plus .node-diagram) are shared with
+   every other slide (How-it-works, Networks, Vault, Extension, FAQ,
+   Get-started) or reused as-is by other tab variants, so every rule here
+   is scoped through #features (the slide's own id) rather than edited at
+   the shared-class level. Mobile is untouched — these only bite above the
+   900px breakpoint the shared rules already use for their own stacking.
+
+   .h-scroll__slide centers its content vertically (align-items:center),
+   so when the stack is taller than the viewport it overflows evenly at
+   *both* top and bottom — that's why a too-tall stack read as "headline
+   clipped at the top, card clipped at the bottom" rather than just
+   scrolling. Fixing it is entirely about the total stacked height below,
+   hand-budgeted with margin against the tightest common desktop viewport
+   (1366x768) — real confirmation still needs your browser. */
+@media (min-width:901px){
+  #features.h-scroll__slide{padding:48px var(--gutter) 24px}
+  #features .h-scroll__stack{gap:10px}
+  #features .section-head{gap:8px}
+  #features .section-head__title{font-size:clamp(1.8rem,1.05rem + 2vw,2.7rem)}
+  #features .section-head__desc{font-size:14px;line-height:1.5;max-width:58ch}
+
+  /* Pills: single row, no wrap. The 01-06 numbers are dropped at this
+     breakpoint (mobile keeps them) purely to buy width — six full labels
+     ("Origin-checked extension", "Nothing leaves your device", ...) at a
+     tighter size just fit var(--container) with room to spare; overflow-x
+     is a safety net in case a particular font's metrics run wider than
+     hand-measured, not the intended path. */
+  #features .showcase__tabs{gap:8px;flex-wrap:nowrap;overflow-x:auto;padding-bottom:2px}
+  #features .showcase__tab{padding:8px 13px;font-size:12px;white-space:nowrap}
+  #features .showcase__tab-num{display:none}
+
+  #features .showcase{gap:14px}
+  #features .showcase__stage{min-height:auto;padding:clamp(14px,2vw,22px)}
+  #features .showcase__panel{gap:24px}
+  #features .showcase__panel-copy{gap:9px}
+  #features .showcase__panel-icon{width:50px;height:50px;border-radius:15px}
+  #features .showcase__panel-icon .icon{width:24px;height:24px}
+  #features .showcase__panel-title{font-size:clamp(1.2rem,1rem + .7vw,1.6rem)}
+  #features .showcase__panel-desc{font-size:13px;line-height:1.55}
+  #features .showcase__panel-diagram{gap:8px}
+  #features .showcase__panel-caption{font-size:11px}
+  #features .node-diagram,#features .feature-visual{max-width:190px}
+}
+
+/* How it works — pinned, scroll-scrubbed sequence (see HowItWorks.jsx).
+   Same tall-spacer + sticky-child technique as .hero-pin-wrap/.hero-cinema
+   above, just with several sequential named stages read off one
+   scrollYProgress instead of a single continuous transform. --static
+   (added under prefers-reduced-motion, mirroring --hero-pin-wrap--static)
+   drops the pin entirely — a plain, unpinned section showing every card on
+   its front face. Explicit #000000 here too (not just inherited from
+   .mkt-page's cascade) for the same "no seam" robustness as .hero-cinema's
+   own explicit background. */
+.how-it-works-pin{position:relative;height:500vh}
+.how-it-works-pin .how-it-works{position:sticky;top:0;z-index:5;width:100%;min-height:100svh;display:flex;align-items:center;justify-content:center;padding:96px var(--gutter) 48px;background:#000000;overflow:hidden}
+.how-it-works-pin--static{height:auto}
+.how-it-works-pin--static .how-it-works{position:relative;z-index:auto}
+
+.how-it-works__cards{max-width:var(--container);width:100%;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr);gap:20px}
+
+/* Each card gets its own perspective (rather than one shared on the grid)
+   so every card's flip looks the same regardless of its column position —
+   no edge-of-row fisheye skew. */
+.step-card{position:relative;aspect-ratio:3/4;perspective:1400px}
+.step-card__inner{position:relative;width:100%;height:100%;transform-style:preserve-3d}
+.step-card__face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:20px;border:1px solid var(--line);background:var(--panel);display:flex;flex-direction:column;padding:24px}
+.step-card__face--back{transform:rotateY(180deg);align-items:flex-start;justify-content:space-between}
+
+.step-card__num{font-family:var(--font-display);font-size:12.5px;font-weight:700;letter-spacing:.08em;color:var(--muted)}
+/* Back face's num+title echoes the front's (per the Sly reference — "02 —
+   THE SCAN" stays visible top-left once flipped), but dimmer/smaller so it
+   reads as a secondary label, not competing with the conclusion sentence
+   that's the back face's actual point. */
+.step-card__num--back{font-size:11px;opacity:.6}
+.step-card__icon-wrap{flex:1;display:flex;align-items:center;justify-content:center}
+.step-card__icon-ring{position:relative;width:76px;height:76px;border-radius:50%;border:1px solid;display:flex;align-items:center;justify-content:center}
+.step-card__icon-ring .icon{width:28px;height:28px;position:relative;z-index:1}
+.step-card__icon-pulse{position:absolute;inset:-8px;border-radius:50%;border:1px solid;pointer-events:none}
+.step-card__back-text{font-family:var(--font-display);font-weight:700;font-size:1.3rem;line-height:1.28;margin:0;max-width:20ch}
+
+@media (max-width:900px){.how-it-works__cards{grid-template-columns:1fr 1fr}}
+@media (max-width:560px){.how-it-works__cards{grid-template-columns:1fr}.step-card{aspect-ratio:4/3}}
+
+/* Trust / tech badge row */
+.badge-row{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;max-width:var(--container);margin:0 auto;padding:0 var(--gutter)}
+.badge-pill{display:inline-flex;align-items:center;gap:8px;padding:9px 16px;border-radius:var(--radius-pill);border:1px solid var(--line);font-size:13px;font-weight:600;color:var(--muted);background:var(--panel);transition:border-color var(--dur-fast),color var(--dur-fast)}
+.badge-pill:hover{border-color:var(--gold);color:var(--ink)}
+.badge-pill .icon{width:16px;height:16px;color:var(--gold-600)}
+
+/* Section 2 — light "spotlight" section, the inverse of .hero-cinema's own
+   trick: that one forces itself dark regardless of the sitewide toggle,
+   this forces itself light the same way, scoped to just this slide via a
+   modifier parallel to .h-scroll__slide--hero. Literal radial-gradient
+   background (not routed through --bg, since it's a gradient here and
+   --bg is read as a plain color elsewhere, e.g. .mkt-footer) — full-bleed
+   edge-to-edge like the hero, not an inset card. See StatsSpotlight.jsx. */
+.h-scroll__slide--spotlight{
+  background:radial-gradient(circle at 68% 40%, #ffffff 0%, #f6f6f6 45%, #e9e9e9 100%);
+  --ink:#0a0a0a;
+  --muted:rgba(10,10,10,0.55);
+  --line:rgba(10,10,10,0.1);
+  --panel:#ffffff;
+  --glass:rgba(10,10,10,0.04);
+}
+.spotlight-section{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,0.8fr);gap:clamp(32px,6vw,72px);align-items:center;max-width:var(--container);width:100%;margin:0 auto;text-align:left}
+.spotlight-section__copy{display:flex;flex-direction:column;gap:18px;align-items:flex-start}
+.spotlight-section__label{font-family:var(--font-display);font-size:13px;font-weight:600;letter-spacing:.28em;text-transform:uppercase;color:var(--gold-600)}
+.spotlight-section__headline{margin:0;font-weight:800;font-size:clamp(2.4rem,1.3rem + 4.8vw,5.4rem);line-height:1.05;letter-spacing:-0.02em;color:var(--ink)}
+.spotlight-section__desc{margin:0;max-width:46ch;font-size:var(--step-0);line-height:1.65;color:var(--muted)}
+
+.spotlight-section__stats{display:flex;flex-direction:column;gap:26px}
+.spotlight-stat{display:flex;flex-direction:column;gap:6px}
+.spotlight-stat__value{font-family:var(--font-display);font-size:clamp(1.8rem,1.4rem + 1.4vw,2.6rem);font-weight:700;letter-spacing:-0.02em;color:var(--ink)}
+.spotlight-stat__label{font-size:13.5px;font-weight:600;color:var(--muted)}
+.spotlight-stat__bar{display:block;height:2px;width:100%;background:var(--gold);transform-origin:left;border-radius:2px}
+
+@media (max-width:900px){
+  .spotlight-section{grid-template-columns:1fr;text-align:center}
+  .spotlight-section__copy{align-items:center}
+  .spotlight-section__stats{align-items:center}
+  .spotlight-stat{align-items:center}
+}
+
+/* Networks — pinned, scroll-scrubbed two-column reveal (see Networks.jsx):
+   a fixed title on the left, one big card on the right crossfading through
+   the 4 chains as progress advances, gated behind a click-to-continue
+   arrow once all 4 have shown. Same tall-spacer + sticky-child pin
+   technique as .how-it-works-pin above. Replaces three earlier iterations
+   (the old branching-line diagram, a flat-card grid, and a monochrome
+   video-masked-logo naked row) — see prompt/0065 for why. --static (added
+   under prefers-reduced-motion) drops the pin and the scroll-lock
+   entirely — see Networks.jsx's own static branch. */
+.networks-pin{position:relative;height:380vh}
+.networks-pin .networks-inner{position:sticky;top:0;z-index:5;width:100%;min-height:100svh;display:flex;align-items:center;justify-content:center;padding:96px var(--gutter) 48px;background:#000000;overflow:hidden}
+.networks-pin--static{height:auto}
+.networks-pin--static .networks-inner{position:relative;z-index:auto}
+
+.networks-split{display:grid;grid-template-columns:1fr 1fr;gap:clamp(40px,6vw,96px);align-items:center;width:100%;max-width:var(--container)}
+.networks-split__left{display:flex;flex-direction:column;align-items:flex-start;gap:20px;text-align:left}
+.networks-split__desc{color:var(--muted);font-size:var(--step-0);line-height:1.6;max-width:48ch;margin:0}
+
+.networks-icons{display:flex;gap:12px}
+/* The gate — a real open/closed toggle (Networks.jsx's handleToggle), not
+   a one-shot button: --down (closed, icon pointing toward the next
+   section) pulses as a "click me" affordance; --up (open, icon flipped to
+   point back toward the title) doesn't, since by then the user has
+   already used it at least once. Both states stay visible/focusable
+   either way. */
+.networks-arrow{width:52px;height:52px;border-radius:50%;border:1px solid var(--line);background:var(--panel);display:flex;align-items:center;justify-content:center;color:var(--ink);cursor:pointer;transition:border-color .3s var(--ease-out),transform .3s var(--ease-out),opacity .3s var(--ease-out)}
+.networks-arrow:hover{border-color:var(--gold);transform:translateY(2px)}
+.networks-arrow .icon{width:20px;height:20px;transition:transform .35s var(--ease-out)}
+.networks-arrow--down .icon{transform:rotate(90deg)}
+.networks-arrow--up .icon{transform:rotate(-90deg)}
+.networks-arrow--pulse{animation:networks-arrow-pulse 2.2s ease-in-out infinite}
+@keyframes networks-arrow-pulse{0%,100%{box-shadow:0 0 0 0 rgba(219,176,87,0.45)}50%{box-shadow:0 0 0 10px rgba(219,176,87,0)}}
+@media (prefers-reduced-motion:reduce){.networks-arrow--pulse{animation:none}}
+
+.networks-split__right{display:flex;justify-content:center}
+/* Card language matches How it works' own step-card faces exactly
+   (border-radius/border/background) — not a new card language. */
+.networks-card{position:relative;width:100%;max-width:340px;aspect-ratio:4/5;border-radius:20px;border:1px solid var(--line);background:var(--panel);display:flex;align-items:center;justify-content:center;padding:32px}
+.networks-card__mark-wrap{width:120px;height:120px;filter:drop-shadow(0 4px 14px rgba(0,0,0,0.4))}
+.networks-card__fluxio{width:100%;height:100%;object-fit:contain;filter:brightness(0) invert(1)}
+.networks-card__footer{position:absolute;left:24px;bottom:22px;display:flex;flex-direction:column;gap:2px;text-align:left}
+.networks-card__name{font-family:var(--font-display);font-weight:700;font-size:1.1rem}
+.networks-card__meta{font-size:12px;color:var(--muted)}
+
+/* ChainMark.jsx — a flat white silhouette per chain; Ethereum's facet
+   lines read as an etched detail over the fill, not a separate color. */
+.chain-mark{width:100%;height:100%}
+.chain-mark polygon,.chain-mark circle{fill:rgba(255,255,255,0.94)}
+.chain-mark__facet line{stroke:rgba(10,10,10,0.3);stroke-width:1.5}
+
+/* Reduced-motion static fallback: all 4 chains in one small grid instead
+   of the interactive single-card cycle. */
+.networks-static-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;width:100%;max-width:var(--container);margin:24px auto 0}
+.networks-card--static{max-width:none;aspect-ratio:1;padding:20px}
+.networks-card--static .networks-card__mark-wrap{width:64px;height:64px}
+.networks-card--static .networks-card__footer{position:static;margin-top:14px;align-items:center;text-align:center}
+
+@media (max-width:900px){
+  .networks-split{grid-template-columns:1fr;text-align:center}
+  .networks-split__left{align-items:center;text-align:center}
+}
+@media (max-width:640px){
+  .networks-static-grid{grid-template-columns:1fr 1fr}
+}
+@media (max-width:420px){
+  .networks-static-grid{grid-template-columns:1fr}
+}
+
+/* Networks section only — bigger eyebrow/headline/description than a more
+   conservative earlier pass (prompt/0064 wanted the section to feel full,
+   prompt/0065 keeps that sizing). .section-head__title/.eyebrow are shared
+   with every other slide, so scoped through #networks (this component's
+   own id, on .networks-pin) rather than edited at the shared-class level.
+   Applies to both the pinned left column and the reduced-motion static
+   heading, since both reuse the same shared classes. */
+@media (min-width:901px){
+  #networks .eyebrow{font-size:15px}
+  #networks .section-head__title{font-size:clamp(2.1rem,1.2rem + 2.8vw,3.6rem)}
+  #networks .section-head__desc{font-size:16px;line-height:1.55;max-width:58ch}
+}
+
+/* Vault — pinned, scroll-scrubbed 4-stage choreography (see Vault.jsx):
+   fixed text on the left, a big animated stage on the right. Same pin
+   technique as .how-it-works-pin/.networks-pin above, at 650vh (a longer
+   run than either — this choreography has more distinct beats). No
+   overflow:hidden on .vault-inner (unlike those two) — deliberately, since
+   the encryption-label callouts are meant to reach out past the stage's
+   own edges (see .vault-label below), and clipping them would just
+   recreate a version of the very text-clipping bug this rebuild fixes
+   (the old layout's title got cut off — see .vault-split__title's own
+   comment). The page is solid #000000 everywhere already (see .mkt-page),
+   so nothing but more black is ever behind a label that reaches slightly
+   wide.
+   Grew from 550vh -> 650vh in prompt/0073 to fit the new grid-hold +
+   break-apart beat at the start of stage 1 without rushing it — the extra
+   100vh maps almost exactly onto that new beat alone (see Vault.jsx's own
+   GRID_END/STAGE1_END comment); stage 2/3/4's own physical scroll length
+   is essentially unchanged (~440vh either way), so nothing past the new
+   beat feels any different than before. */
+.vault-pin{position:relative;height:650vh}
+.vault-pin .vault-inner{position:sticky;top:0;z-index:5;width:100%;min-height:100svh;display:flex;align-items:center;justify-content:center;padding:96px var(--gutter) 48px;background:#000000}
+/* .vault-pin--static now applies below the 900px section-collapse
+   breakpoint too, not just under prefers-reduced-motion (see Vault.jsx's
+   `simple` flag, prompt/0074) — a 650vh scroll-jacked pin is a heavy,
+   disorienting amount of scrolling on a small screen regardless of motion
+   preference, so mobile always gets the plain non-pinned layout instead. */
+.vault-pin--static{height:auto}
+/* overflow:hidden added here, mobile/reduced-motion-only, prompt/0129 — NOT
+   on the shared base .vault-pin .vault-inner rule above, which deliberately
+   stays unclipped for desktop's circular labels (see that rule's own long
+   comment: clipping them there would recreate the prompt/0075-0079 label-
+   clipping bug). This mode never renders those circular labels (they become
+   .vault-labels-row here, a normal-flow chip row — see that class's own
+   comment), so clipping is safe, and it's needed: .vault-split__title sits
+   in its pre-reveal transformed state (an off-screen x/rotateX offset)
+   until its own whileInView fires, and with no overflow:hidden ancestor
+   that state leaked past this section's box and inflated
+   document.documentElement.scrollWidth — a real, time-based (not just
+   scroll-position-based) horizontal overflow, confirmed growing at a FIXED
+   scroll position purely as elapsed time passed. Same fix/reasoning at
+   .ext-pin--static .ext-inner below for Extension's own equivalent title. */
+.vault-pin--static .vault-inner{position:relative;z-index:auto;overflow:hidden}
+
+.vault-split{display:grid;grid-template-columns:1fr 1fr;gap:clamp(40px,6vw,96px);align-items:center;width:100%;max-width:var(--container)}
+.vault-split__left{display:flex;flex-direction:column;align-items:flex-start;gap:16px;text-align:left}
+/* The bug this rebuild fixes: the old layout gave this column only
+   ~0.85fr of a 3-column grid (~300px net) while sizing the headline up to
+   4.1rem — "spreadsheet" (one unbreakable word) was wider than its own
+   column and got cut off with nothing to wrap it. Fixed two ways at once,
+   not just one: a plain 2-column split gives this text roughly half the
+   container (~600px) instead of ~300px, *and* the max size here is capped
+   much lower (3rem, not 4.1rem) — either fix alone would likely have been
+   enough, both together leave real margin. overflow-wrap is a last-resort
+   safety net, not the primary fix. */
+.vault-split__title{font-size:clamp(1.8rem,1.1rem + 2.2vw,3rem);font-weight:800;letter-spacing:-0.02em;line-height:1.1;max-width:14ch;overflow-wrap:break-word;margin:8px 0 0}
+.vault-split__desc{font-size:var(--step-0);color:var(--muted);line-height:1.6;max-width:50ch;margin:0}
+
+.vault-split__right{display:flex;justify-content:center}
+/* A dedicated wrapper for the non-desktop modes' multiple stacked children
+   (stage, then labels-row, then badge — see Vault.jsx's prompt/0074/0075
+   comments), rather than a flex-direction change on .vault-split__right
+   itself — an earlier version of this did change .vault-split__right, and
+   it regressed the desktop pinned branch's top label (pushed the whole
+   .vault-split taller, clipping the label against the pinned viewport
+   edge — prompt/0075). Keeping .vault-split__right untouched means the
+   desktop branch's CSS is byte-identical to before prompt/0074 again. */
+.vault-simple-stack{display:flex;flex-direction:column;align-items:center;gap:20px;width:100%}
+/* 380px, down from 440px (prompt/0078) — shrinks the whole desktop/tablet
+   visual, and every circular label's reach with it (LABEL_R/LABEL_RING_R
+   in Vault.jsx are percentages of this box, so they scale down for free),
+   so the fix below has less distance to cover and the bottom label
+   ("unique nonce") keeps clearance too, not just the top one. */
+.vault-stage{position:relative;width:100%;max-width:380px;aspect-ratio:1}
+.vault-glow{position:absolute;inset:10%;border-radius:50%;background:radial-gradient(circle,var(--gold) 0%,transparent 70%);filter:blur(40px);pointer-events:none}
+
+/* Guaranteed clearance for the top circular label against the pinned
+   viewport (prompt/0078 — the actual fix, not another investigation
+   round). .vault-inner's own 96px padding-top was never really the
+   binding constraint: .mkt-nav is `position:fixed` with ~100-115px of
+   real bar height (.mkt-nav__bar's own clamp(18px,3vw,34px) vertical
+   padding + its button/logo row) sitting ON TOP of everything at z-index
+   60 vs. this section's z-index 5 — once the nav turns solid on scroll
+   (.mkt-nav--solid), it visually covers that whole top strip regardless
+   of what .vault-inner's own padding says, and .vault-split's vertical
+   centering slack (align-items:center, viewport-height-dependent) was
+   never guaranteed to add enough on top of that. margin-top is a real
+   box-model value, so it becomes part of what align-items:center centers
+   — the visual reliably sits this far down inside its own centered slot
+   on ANY viewport height, not just tall ones. 140px clears the nav
+   (~100-115px) plus the requested ~40-60px breathing room below it,
+   applied only >=901px since <=900px never uses the circular label
+   pattern this exists to protect (see .vault-labels-circular below).
+   140px -> 90px (prompt/0079): 140 turned out to overcorrect — cleared
+   the navbar with room to spare on top, but pushed "unique nonce" too
+   close to the bottom edge. Nudging this one value up/down shifts the
+   *whole* visual (both top and bottom labels move together, since both
+   are positioned relative to this same box), so a straight reduction
+   closes the excess top gap and reopens bottom clearance at the same
+   time — no separate bottom-specific rule needed. */
+@media (min-width:901px){
+  .vault-stage{margin-top:90px}
+}
+
+/* Stage 1-2 — word chips (SeedChip in Vault.jsx). Generic BIP-39 wordlist
+   entries only, never a real/fake phrase in reading order — see
+   Vault.jsx's own WORDS comment. Starts arranged in a numbered 3x4 grid
+   (reads like a real seed-phrase backup screen), then breaks apart into
+   the scattered floating formation before being sucked into the vault. */
+.vault-chip{position:absolute;padding:6px 12px;border-radius:var(--radius-pill);border:1px solid var(--line);background:var(--panel);color:var(--muted);font-family:var(--font-body);font-size:11.5px;font-weight:600;white-space:nowrap;pointer-events:none}
+.vault-chip__num{color:var(--gold-600);font-weight:700}
+
+/* Stage 2 — the vault core itself: hidden (scale 0) until the chips finish
+   arriving, then scales/rotates in with a small overshoot ("clunk") driven
+   entirely by scroll position (see Vault.jsx's coreScale/coreRotate). */
+.vault-core{position:absolute;left:50%;top:50%;translate:-50% -50%;width:100px;height:100px;border-radius:28px;background:var(--panel);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;box-shadow:var(--shadow-1);z-index:2}
+.vault-core .icon{width:44px;height:44px;color:var(--gold)}
+.vault-pulse{position:absolute;left:50%;top:50%;translate:-50% -50%;width:100px;height:100px;border-radius:28px;border:1.5px solid var(--gold);pointer-events:none}
+
+/* Stage 3 — encryption rings (EncryptionRing in Vault.jsx): an outer layer
+   carries the scroll-driven rotation, an inner layer adds the stage-4 idle
+   spin on top once sealed — nested rotations compose additively, so the
+   handoff from scroll-driven to independent-loop rotation has no visible
+   jump (the idle loop always starts from a relative 0). */
+.vault-ring-wrap{position:absolute;inset:0}
+.vault-ring-spin{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+.vault-ring-svg{width:100%;height:100%;overflow:visible}
+.vault-ring-circle{fill:none;stroke-width:1}
+
+/* Technical labels + their thin connector lines back to the rings —
+   reaching out past .vault-stage's own bounds on purpose, see .vault-inner
+   above for why that's safe here. Anchor classes decide which edge of the
+   text sits at the connector's endpoint, so the label always reads as
+   growing *outward* from the vault regardless of which side it's on. */
+.vault-label-line-svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}
+.vault-label-line{stroke:var(--line);stroke-width:0.6}
+.vault-label{position:absolute;max-width:120px;font-family:var(--font-body);font-size:11px;font-weight:600;color:var(--muted);text-align:center;line-height:1.35;pointer-events:none}
+.vault-label--top{translate:-50% -100%;padding-bottom:6px}
+.vault-label--bottom{translate:-50% 0;padding-top:6px}
+.vault-label--right{translate:0 -50%;padding-left:6px;text-align:left}
+.vault-label--left{translate:-100% -50%;padding-right:6px;text-align:right}
+/* Wraps the circular label markup so it can be swapped for .vault-labels-row
+   below 900px via one media query (prompt/0074) — display:contents keeps it
+   invisible as a box, its children stay absolutely positioned against
+   .vault-stage exactly as before. */
+.vault-labels-circular{display:contents}
+
+/* Mobile-only alternative to the circular pattern above: a plain wrapped
+   row of chips below the stage instead of labels reaching outward around a
+   ring — the circular pattern only has room to work in the 2-column
+   desktop layout (see .vault-labels-circular's own comment and the
+   @media (max-width:900px) block below). Hidden by default; shown only
+   under that same breakpoint. */
+.vault-labels-row{display:none;flex-wrap:wrap;justify-content:center;gap:8px;max-width:320px}
+.vault-label-chip{padding:6px 12px;border-radius:var(--radius-pill);border:1px solid var(--line);background:var(--panel);color:var(--muted);font-family:var(--font-body);font-size:11px;font-weight:600;white-space:nowrap}
+
+/* Fine orbiting particles — a zero-size anchor at dead center, rotated
+   continuously; its child sits offset by --orbit-r, so rotating the
+   (invisible) anchor traces the child in a circle around it. */
+.vault-particles{position:absolute;inset:0}
+.vault-particle-orbit{position:absolute;left:50%;top:50%;width:1px;height:1px}
+.vault-particle{position:absolute;left:0;top:0;width:5px;height:5px;margin:-2.5px 0 0 -2.5px;border-radius:50%;background:var(--teal);translate:var(--orbit-r) 0}
+
+/* Stage 4 — the sealed badge. Absolute-inside-the-stage (bottom:8% of the
+   circle) only has safe room to sit unobstructed in the animated desktop
+   branch's larger stage; the `simple` branch (prompt/0074) uses
+   .vault-badge--static instead, a normal-flow sibling below the stage
+   rather than overlapping anything inside it. */
+.vault-badge{position:absolute;left:50%;bottom:8%;translate:-50% 0;padding:6px 14px;border-radius:var(--radius-pill);border:1px solid var(--gold);background:rgba(219,176,87,0.12);color:var(--gold-600);font-family:var(--font-display);font-size:11.5px;font-weight:700;letter-spacing:.04em;white-space:nowrap}
+.vault-badge--static{position:static;translate:none}
+
+/* Reduced-motion static stage — stage 4's own settled state, no chips (all
+   "absorbed"), rings/labels static, matching Vault.jsx's static branch. */
+.vault-stage--static .vault-ring-wrap{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+
+@media (max-width:900px){
+  .vault-split{grid-template-columns:1fr;text-align:center}
+  .vault-split__left{align-items:center;text-align:center}
+  .vault-split__title{max-width:none}
+  /* Below the 2-column breakpoint the circular label pattern has nowhere
+     safe to reach outward into (see .vault-labels-circular's own comment)
+     — swap it for the flat chip row instead of just shrinking it further. */
+  .vault-labels-circular{display:none}
+  .vault-labels-row{display:flex}
+  /* Proportionally smaller stage now that it's the only wide element in a
+     single mobile column (prompt/0074) — the old 300px value predates the
+     chip-row swap above and was sized for a stage that still had circular
+     labels reaching past its own edges; it can come down further now that
+     nothing needs to reach outward from it on this breakpoint. */
+  .vault-stage{max-width:260px}
+}
+@media (max-width:420px){
+  .vault-stage{max-width:220px}
+}
+
+/* Extension — "Your keys never meet the page.", rebuilt as a pinned,
+   scroll-scrubbed 3-stage choreography of a signing request's journey
+   (see ExtensionFlow.jsx), plus a genuinely interactive 4th stage that
+   plays on click. Same pin technique as .vault-pin/.how-it-works-pin
+   above, at 440vh (shorter than Vault's 650vh — only 3 scroll-driven
+   stages here; the interactive 4th isn't scroll-bound at all). Unlike
+   Vault's circular labels, every element here is deliberately kept
+   inside .ext-stage's own box — reaching outside it is exactly what
+   caused Vault's desktop navbar-clipping bug (prompt/0075-0079); not
+   repeating that class of mistake here. */
+.ext-pin{position:relative;height:440vh}
+.ext-pin .ext-inner{position:sticky;top:0;z-index:5;width:100%;min-height:100svh;display:flex;align-items:center;justify-content:center;padding:96px var(--gutter) 48px;background:#000000}
+.ext-pin--static{height:auto}
+/* overflow:hidden added here, mobile/reduced-motion-only, prompt/0129 — see
+   .vault-pin--static .vault-inner's own comment above for the full
+   reasoning (same fix, same root cause: .ext-split__title's pre-reveal
+   transformed/off-screen state leaking past this section and inflating
+   document.documentElement.scrollWidth). Left off the shared base
+   .ext-pin .ext-inner rule out of the same caution as Vault's, even though
+   this file's own comment above claims desktop content stays inside
+   .ext-stage's box deliberately (unlike Vault's labels) — scoping to
+   mobile-only costs nothing extra and avoids re-auditing every desktop
+   element (hover states, the interactive 4th stage) against that claim. */
+.ext-pin--static .ext-inner{position:relative;z-index:auto;overflow:hidden}
+
+.ext-split{display:grid;grid-template-columns:0.85fr 1.35fr;gap:clamp(40px,6vw,96px);align-items:center;width:100%;max-width:var(--container)}
+.ext-split__left{display:flex;flex-direction:column;align-items:flex-start;gap:16px;text-align:left}
+.ext-split__title{font-size:clamp(1.8rem,1.1rem + 2.2vw,3rem);font-weight:800;letter-spacing:-0.02em;line-height:1.1;max-width:16ch;overflow-wrap:break-word;margin:8px 0 0}
+.ext-split__desc{font-size:var(--step-0);color:var(--muted);line-height:1.6;max-width:52ch;margin:0}
+
+.ext-split__right{display:flex;justify-content:center}
+/* flex-column + justify-content:center centers .ext-row (the only normal-
+   flow child — .ext-popup/.ext-blocked/.ext-scan/.ext-signed-badge are
+   all position:absolute) vertically, leaving room above for the popup and
+   below for the blocked-path curve without any manual offset math. */
+.ext-stage{position:relative;width:100%;max-width:560px;aspect-ratio:1;display:flex;flex-direction:column;justify-content:center}
+
+.ext-row{display:flex;align-items:center;gap:6px;width:100%}
+/* position:relative so .ext-popup/.ext-signed-badge (children of the
+   gate/vault zones specifically, prompt/0082) can anchor tightly to their
+   own zone's box via bottom:100%+gap, instead of floating at a
+   stage-wide coordinate far from the element they actually relate to. */
+.ext-zone{position:relative;display:flex;flex-direction:column;align-items:center;gap:8px;flex:0 0 auto}
+.ext-node{position:relative;width:64px;height:64px;border-radius:20px;background:var(--panel);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;box-shadow:var(--shadow-1)}
+.ext-node .icon{width:28px;height:28px;color:var(--gold)}
+.ext-node--vault .icon{color:var(--teal)}
+.ext-vault-flash{position:absolute;inset:-6px;border-radius:24px;background:radial-gradient(circle,var(--teal) 0%,transparent 70%);pointer-events:none}
+/* Structural fix, not a magic-number offset (prompt/0084) — the gate icon
+   wasn't actually centered in .ext-row to begin with: .ext-zone--dapp's
+   content (.ext-browser-mini, 104px) is wider than .ext-zone--vault's
+   (.ext-node, 64px), and since both connectors are equal flex:1, that
+   width difference pushed the gate's true center ~20px right of the
+   row's own midpoint. .ext-blocked below assumes the gate sits at
+   .ext-stage's horizontal center (50%) — it was correct, the row
+   underneath it wasn't. Matching this zone's min-width to the dApp
+   zone's own 104px (node stays centered within it, unchanged visually)
+   makes the row genuinely symmetric so the gate really is at 50%,
+   instead of nudging the curve/mark by a number that would only
+   coincidentally look right for this exact content and break again the
+   next time either zone's content changes width. */
+.ext-zone--vault{min-width:104px}
+
+/* dApp mockup — a compact browser bar only (no body), distinct from the
+   Approve popup below (.ext-popup) which is styled as its own small
+   floating panel, not nested inside this bar — a browser extension's
+   popup isn't literally part of the page's own chrome. */
+.ext-browser-mini{display:flex;align-items:center;gap:4px;padding:6px 8px;border-radius:10px;border:1px solid var(--line);background:var(--panel);width:104px}
+.ext-browser-mini__dot{width:5px;height:5px;border-radius:50%;background:var(--line);flex:0 0 auto}
+.ext-browser-mini__url{flex:1;margin-left:2px;font-size:8.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* Stage 2 — "origin verified" badge. Normal flow (not absolute) as the
+   2nd child of .ext-zone's own column, deliberately — its height is
+   reserved from the very first render even while opacity:0, so the gate
+   zone's own footprint never shifts when it fades in. */
+.ext-verified-badge{padding:3px 8px;border-radius:var(--radius-pill);background:rgba(219,176,87,0.12);border:1px solid var(--gold);color:var(--gold-600);font-size:9.5px;font-weight:700;white-space:nowrap}
+.ext-verified-badge__check{color:var(--gold-600)}
+
+/* The one connector that ever carries a traveling element — dApp <->
+   gate (ExtensionFlow.jsx's RequestConnector) — request chip forward,
+   signature indicator back, both along the same line. */
+.ext-connector{position:relative;flex:1;height:24px;min-width:16px}
+.ext-connector__svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.ext-connector__line{fill:none;stroke:var(--gold);stroke-width:1.5}
+.ext-connector__line--trust{stroke:var(--teal);stroke-dasharray:2 3}
+.ext-chip{position:absolute;top:50%;left:0;translate:-50% -50%;padding:4px 10px;border-radius:var(--radius-pill);border:1px solid var(--line);background:var(--panel);color:var(--muted);font-family:var(--font-body);font-size:10.5px;font-weight:600;white-space:nowrap;pointer-events:none;z-index:2}
+.ext-chip--signed{border-color:var(--teal);color:var(--teal);display:flex;align-items:center;gap:4px}
+.ext-chip__check{color:var(--teal)}
+
+/* Stage 2 — scan sweep across the gate. Fixed vertical band via CSS
+   (top/bottom), horizontal position driven by scroll progress (JS). */
+.ext-scan{position:absolute;top:36%;bottom:36%;width:2px;background:linear-gradient(180deg,transparent,var(--gold),transparent);pointer-events:none}
+
+/* Stage 2 — the blocked dApp -> vault shortcut: a dim, dashed curve
+   tucked close under the row (not spanning/dominating the whole stage —
+   prompt/0082 shrank both its footprint and its visual weight after it
+   first shipped reading as the single most prominent thing on the
+   stage), a "x" mark, and a short label. Confined to a band under the
+   row — see this block's own opening comment on why staying inside
+   .ext-stage's own box matters. Mark/label positions (58%/74% of this
+   band's own height) are hand-computed from the actual quadratic curve
+   midpoint (viewBox 0 0 100 30, control point at y=32 -> curve midpoint
+   at y=17.5 -> 17.5/30 ~= 58%), not guessed — still valid regardless of
+   this box's own size since it's relative to its own proportions, not an
+   absolute measurement. var(--line) (a faint ~18% white) + a thinner 1px
+   stroke instead of var(--muted) (66% white, meant for readable
+   secondary TEXT, too bright for a graphic element that should read as
+   clearly tertiary) — the mark/label text itself stays at --muted so
+   it's still legible, only the line dims.
+   left/right 14%->22% and bottom/height retuned again in prompt/0083 —
+   0082's first attempt at "closer/shorter" still left a real gap (the
+   row's own node sits roughly 56-58% down .ext-stage, so bottom:4% put
+   this band's top edge only around the 64% mark — a ~40px gap at a
+   560px stage) and didn't narrow it enough to read as attached to the
+   diagram rather than its own separate feature. */
+.ext-blocked{position:absolute;left:22%;right:22%;bottom:24%;height:12%;pointer-events:none}
+.ext-blocked__svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.ext-blocked__path{fill:none;stroke:var(--line);stroke-width:1;stroke-dasharray:3 4}
+.ext-blocked__mark{position:absolute;top:58%;left:50%;translate:-50% -50%;width:18px;height:18px;border-radius:50%;background:#000;border:1px solid var(--line);color:var(--muted);font-size:11px;line-height:16px;text-align:center}
+.ext-blocked__label{position:absolute;top:74%;left:50%;translate:-50% 0;font-size:9.5px;color:var(--muted);white-space:nowrap}
+
+/* Stage 3 — the approval popup, styled as its own small floating panel
+   (mirrors the pre-rebuild mockup's look, per the prompt's own "gaya
+   dipertahankan" instruction). Anchored to .ext-zone--gate (its parent,
+   see .ext-zone's own comment) rather than .ext-stage's top edge —
+   prompt/0082: floating at the stage's own top left a large dead gap
+   between the popup and the diagram it belongs to; sitting right above
+   the gate keeps it visually attached to the element it's approving a
+   request for. Still never reaches outside .ext-stage's own box (the
+   gate zone sits well clear of the stage's top edge), unlike Vault's old
+   circular labels.
+   width was `min(220px,84%)` — a real bug (prompt/0083), not a sizing
+   choice: `%` on an absolutely-positioned element resolves against its
+   *containing block*, which became .ext-zone--gate itself the moment the
+   popup moved inside it — a ~70-90px-wide shrink-to-fit flex zone, not
+   the ~560px stage. 84% of ~80px is ~67px, crushing "Approve this
+   signature?" onto 3 lines. `min(300px,92vw)` fixes it by capping against
+   the *viewport* instead of the containing block, so it can't be
+   re-broken by wrapping this in yet another narrow ancestor later. The
+   `::before`/`::after` stem+arrowhead below is the "garis/panah konektor
+   kecil" the prompt asked for — a classic speech-bubble pointer, plain
+   CSS, no extra DOM node — closing most of the gap between the popup and
+   the gate icon without literally touching it. */
+.ext-popup{position:absolute;bottom:calc(100% + 22px);left:50%;translate:-50% 0;width:min(300px,92vw);border-radius:16px;border:1px solid var(--line);background:var(--panel);box-shadow:var(--shadow-1);overflow:visible;z-index:3}
+.ext-popup::before{content:'';position:absolute;top:100%;left:50%;translate:-50% 0;width:1.5px;height:13px;background:var(--line)}
+.ext-popup::after{content:'';position:absolute;top:calc(100% + 13px);left:50%;translate:-50% 0;width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:6px solid var(--line)}
+/* border-radius matched to .ext-popup's own 16px, not inherited via
+   overflow:hidden on the parent — that parent needs overflow:visible now
+   so its ::before/::after connector (pointing down at the gate) isn't
+   clipped, so this bar rounds its own top corners instead. */
+.ext-popup__bar{display:flex;align-items:center;gap:6px;padding:8px 10px;border-radius:16px 16px 0 0;border-bottom:1px solid var(--line);background:var(--glass)}
+.ext-popup__dot{width:6px;height:6px;border-radius:50%;background:var(--gold)}
+.ext-popup__title{font-size:10px;font-weight:700;color:var(--muted);letter-spacing:.03em}
+.ext-popup__body{padding:18px 16px;display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center}
+.ext-popup__question{margin:0;font-size:12.5px;font-weight:600;color:var(--ink)}
+
+/* Real, focusable, keyboard-activatable <button> (ExtensionFlow.jsx) —
+   hover/press/focus states are genuine CSS pseudo-classes, not simulated
+   with JS, so Enter/Space work for free via native button semantics. */
+.ext-approve-btn{appearance:none;border:none;padding:8px 22px;border-radius:999px;background:var(--gold);color:var(--slate-950);font-family:var(--font-body);font-size:12px;font-weight:700;cursor:pointer;transition:background var(--dur-fast)}
+.ext-approve-btn:hover:not(:disabled){background:var(--gold-600)}
+.ext-approve-btn:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+.ext-approve-btn:disabled{opacity:.55;cursor:default}
+
+/* Stage 4 (interactive, not scroll-bound — see useSigning() in
+   ExtensionFlow.jsx) — the brief post-signing confirmation. Anchored to
+   .ext-zone--vault (prompt/0082, same reasoning as .ext-popup above) —
+   it appears right above the thing that actually stayed safe, not at an
+   arbitrary stage-wide coordinate. */
+.ext-signed-badge{position:absolute;bottom:calc(100% + 10px);left:50%;translate:-50% 0;padding:5px 12px;border-radius:var(--radius-pill);background:rgba(111,179,168,0.14);border:1px solid var(--teal);color:var(--teal);font-family:var(--font-display);font-size:10.5px;font-weight:700;white-space:nowrap;z-index:4}
+
+@media (max-width:900px){
+  .ext-split{grid-template-columns:1fr;text-align:center}
+  .ext-split__left{align-items:center;text-align:center}
+  .ext-split__title{max-width:none}
+  .ext-stage{max-width:320px;aspect-ratio:auto;display:block}
+  /* Vertical flow instead of the desktop row, rather than trying to
+     reuse the horizontal "row + curve below it" geometry, which doesn't
+     translate to a column. */
+  .ext-col{position:relative;display:flex;flex-direction:column;align-items:center;gap:10px}
+  /* .ext-popup/.ext-signed-badge are still anchored to their own zone
+     (bottom:100%+gap, see those rules above) rather than .ext-col's own
+     top — in a vertical column that zone is no longer at the top of the
+     stage, so the popup needs the *gate zone itself* pushed down to make
+     room for it to render into without overlapping the dApp
+     zone/connector/scan bar that precede it in normal flow. */
+  .ext-zone--gate{margin-top:160px}
+  /* .ext-connector reused as-is (same JSX/left-percentage-driven chip
+     logic) — rotated 90deg rather than rewritten, so the exact same
+     scroll-progress math produces a vertical connector for free. Width/
+     height swapped before rotating so the post-rotation footprint (24px
+     wide x 50px tall) is what actually reserves space in the column. */
+  .ext-connector{width:50px;height:24px;flex:0 0 auto;transform:rotate(90deg);margin:6px 0}
+  .ext-blocked{display:none}
+  .ext-blocked--mobile{position:static;display:flex;align-items:center;justify-content:center;gap:6px;height:auto;margin-top:2px}
+  .ext-blocked--mobile .ext-blocked__mark{position:static;translate:none;background:none;border:none;width:auto;height:auto;font-size:12px}
+  .ext-blocked--mobile .ext-blocked__label{position:static;translate:none}
+  .ext-scan{display:none}
+  .ext-scan--mobile{display:block;top:auto;bottom:auto;left:20%;right:20%;width:auto;height:2px;background:linear-gradient(90deg,transparent,var(--gold),transparent)}
+}
+@media (max-width:420px){
+  .ext-stage{max-width:280px}
+  .ext-zone--gate{margin-top:150px}
+}
+
+/* FAQ — restructured around a scroll-driven progressive word reveal
+   (Faq.jsx, prompt/0085), inspired by pamidordesign.com's own text-scrub
+   effect but adapted to this page's dark palette (their light-background
+   dim(mid-gray)->bright(black) direction flips to dim(#3a3a3a)->
+   bright(#fff) here) and built deliberately WITHOUT a pin: a multi-line
+   paragraph at this font size already provides plenty of its own scroll
+   runway as it passes through the viewport, so skipping the pin sidesteps
+   this whole session's repeated pin+Lenis lessons (Networks' sticky
+   release-point subtlety, Vault's mobile pin weight) entirely instead of
+   re-solving them for a 4th section. One consequence: there's no separate
+   "mobile branch" the way Vault/Extension needed — the exact same
+   useScroll-driven reveal serves both, only type size is responsive. */
+.faq{width:100%;max-width:var(--container);margin:0 auto;text-align:left}
+.faq-head{display:flex;flex-direction:column;gap:8px;margin-bottom:36px}
+/* Demoted from this section's old dominant headline (var(--step-2)) to a
+   smaller, muted context-setter — the reveal paragraph below is now the
+   visually dominant element, matching the reference's own hierarchy.
+   Deliberately kept OUT of prompt 0127's shared ivory/silver gradient
+   system for the same reason — giving this flat --muted grey a shiny
+   sheen would re-elevate it against that established hierarchy. Color
+   left untouched; only .faq-reveal__text's own bright endpoint below
+   (RevealWord in Faq.jsx) was nudged to match the new system's tone. */
+.faq__title{font-size:var(--step-1);font-weight:600;letter-spacing:-0.02em;color:var(--muted);margin:0}
+.faq-reveal__text{font-size:clamp(1.7rem,0.9rem + 2.8vw,3.4rem);font-weight:700;line-height:1.32;letter-spacing:-0.01em;max-width:62ch;margin:0 0 64px}
+/* prompt 0127: --paper (not --ink) to match RevealWord's own new bright
+   endpoint above — reduced-motion users see the same fully-lit tone the
+   animation settles into for everyone else, just without the scroll-scrub. */
+.faq-reveal__text--static{color:var(--paper)}
+.faq__list{width:100%;max-width:52rem;display:flex;flex-direction:column;gap:10px}
+.faq__item{border:1px solid var(--line);border-radius:16px;background:var(--panel);overflow:hidden}
+.faq__question{width:100%;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px 22px;background:none;border:none;cursor:pointer;font-family:var(--font-display);font-weight:600;font-size:15px;color:var(--ink);text-align:left}
+.faq__toggle{flex-shrink:0;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;color:var(--gold-600);background:var(--glass);transition:transform var(--dur-fast)}
+.faq__item--open .faq__toggle{transform:rotate(180deg)}
+.faq__answer-wrap{overflow:hidden}
+.faq__answer{margin:0;padding:0 22px 20px;color:var(--muted);font-size:13.5px;line-height:1.6}
+
+@media (max-width:640px){
+  .faq-reveal__text{margin-bottom:40px}
+  .faq__list{max-width:none}
+}
+
+/* Rich marketing footer */
+.mkt-footer{border-top:1px solid var(--line);padding:64px var(--gutter) 28px;background:var(--bg)}
+.mkt-footer__top{display:grid;grid-template-columns:1.3fr repeat(3,1fr);gap:32px;max-width:var(--container);margin:0 auto;padding-bottom:40px}
+.mkt-footer__brand{display:flex;flex-direction:column;gap:14px}
+.mkt-footer__brand-mark{display:flex;align-items:center;gap:10px}
+.mkt-footer__brand-mark img{height:28px}
+.mkt-footer__brand-mark span{font-family:var(--font-display);font-weight:700;font-size:17px}
+.mkt-footer__tag{color:var(--muted);font-size:13.5px;max-width:32ch;line-height:1.65;margin:0}
+.mkt-footer__col h4{font-size:12px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin:0 0 14px;font-weight:600}
+.mkt-footer__col a{display:block;color:var(--ink);text-decoration:none;font-size:14px;padding:6px 0;opacity:.82;transition:opacity var(--dur-fast),color var(--dur-fast)}
+.mkt-footer__col a:hover{opacity:1;color:var(--gold-600)}
+.mkt-footer__bottom{max-width:var(--container);margin:0 auto;padding-top:24px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;color:var(--muted);font-size:13px}
+.mkt-footer__socials{display:flex;gap:10px}
+.mkt-footer__socials a{display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;border:1px solid var(--line);color:var(--ink);transition:border-color var(--dur-fast),color var(--dur-fast),transform var(--dur-fast)}
+.mkt-footer__socials a:hover{border-color:var(--gold);color:var(--gold-600);transform:translateY(-2px)}
+.mkt-footer__socials .icon{width:16px;height:16px}
+.mkt-footer__socials .icon-mask{width:16px;height:16px}
+
+/* Prompt 0165 — Telegram's icon has no matching entry in Icon.jsx's inline-SVG
+   switch (it's a bitmap logo, not hand-drawn), so it's rendered as a masked
+   <span> instead: -webkit-mask-image/mask-image clips a solid background-color
+   box to the logo's silhouette (telegram-logo-mask.png's own alpha channel —
+   see that file's own generation notes in prompt/0165's archive), and
+   background-color:currentColor means it automatically follows whichever
+   color the surrounding <a> already resolves to (ink/gold-600 in the footer,
+   the overlay's own muted/paper colors in the nav) — the exact same
+   hover/theme behavior Icon's inline SVGs get from fill="currentColor",
+   with zero icon-specific CSS beyond sizing needed at either call site.*/
+.icon-mask{display:inline-block;-webkit-mask-image:url(../assets/telegram-logo-mask.png);mask-image:url(../assets/telegram-logo-mask.png);-webkit-mask-size:contain;mask-size:contain;-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;-webkit-mask-position:center;mask-position:center;background-color:currentColor}
+@media (max-width:820px){.mkt-footer__top{grid-template-columns:1fr 1fr}}
+@media (max-width:560px){.mkt-footer__top{grid-template-columns:1fr}}
+
+/* Privacy Policy page (prompt 0122) — a real content page, not a marketing
+   slide: plain readable article layout, deliberately NOT reusing
+   .section-head/.faq-reveal__text's large display-scale headings or any
+   scroll-triggered/motion styling (see Privacy.jsx's own header comment —
+   "sederhana... tanpa animasi" was explicit). Sits inside .mkt-page for
+   the same permanent-dark theme + MarketingNav/MarketingFooter chrome as
+   Landing.jsx, just with a simple top-padded content column instead of
+   the vertical section stack. */
+.privacy-page{width:100%;padding:calc(clamp(18px,3vw,34px) + 64px) var(--gutter) 48px;overflow-x:hidden}
+.privacy-page__inner{max-width:68ch;margin:0 auto}
+/* Explicit "back to home" link (prompt 0123) — the navbar's own logo
+   already links to "/", but that alone read as too easy to miss; this
+   sits directly above the H1 as a second, unambiguous way back. */
+.privacy-page__back{display:inline-flex;align-items:center;gap:6px;font-size:var(--step--1);color:var(--muted);text-decoration:none;margin-bottom:24px;transition:color var(--dur-fast) var(--ease-out)}
+.privacy-page__back:hover{color:var(--gold-600)}
+.privacy-page__inner h1{font-family:var(--font-display);font-weight:700;font-size:var(--step-3);letter-spacing:-0.02em;line-height:1.1;margin:0 0 8px}
+.privacy-page__updated{color:var(--muted);font-size:var(--step--1);margin:0 0 32px}
+.privacy-page__lead{font-size:var(--step-1);line-height:1.6;color:var(--ink);margin:0 0 36px}
+.privacy-page__inner h2{display:flex;align-items:center;gap:10px;font-family:var(--font-display);font-weight:600;font-size:var(--step-1);letter-spacing:-0.01em;margin:40px 0 12px}
+/* One small, CONSISTENT outline icon per section heading (prompt 0122
+   Revision 1) — deliberately a single muted accent color for every
+   heading rather than FeatureShowcase's alternating gold/teal: with 9
+   headings on one page, alternating colors would read as busy/confetti
+   rather than calm-and-consistent, which is what "ikon ... yang
+   konsisten" (singular, uniform) actually asked for. */
+.privacy-page__h-icon{width:20px;height:20px;flex:0 0 auto;color:var(--gold-600)}
+.privacy-page__inner p{font-size:var(--step-0);line-height:1.7;color:var(--muted);margin:0 0 16px}
+.privacy-page__inner ul{margin:0 0 16px;padding-left:1.3em;display:flex;flex-direction:column;gap:10px}
+.privacy-page__inner li{font-size:var(--step-0);line-height:1.65;color:var(--muted)}
+.privacy-page__inner strong{color:var(--ink);font-weight:600}
+.privacy-page__inner code{font-family:ui-monospace,"SF Mono",Consolas,monospace;font-size:.92em;background:var(--glass);border:1px solid var(--line);border-radius:4px;padding:.12em .4em}
+/* Prompt 0144 — replaces the old [TODO: contact email] placeholder, which
+   was an <em> tag riding this page's generic (now-removed) em{} accent
+   rule. A real mailto: link needs its own class instead of a bare <em>,
+   but keeps the same --gold-600 accent language the rest of this page
+   already uses (see .privacy-page__h-icon, .privacy-page__back:hover)
+   rather than inventing a new color/underline convention — this site's
+   other inline links (.mkt-footer__col a) are also text-decoration:none
+   with only a color/opacity shift on hover, not an underline. */
+.privacy-page__contact-link{color:var(--gold-600);font-weight:600;text-decoration:none;transition:color var(--dur-fast) var(--ease-out)}
+.privacy-page__contact-link:hover{color:var(--gold)}
+
+/* Privacy data-flow diagram, FIFTH pass (prompt 0122 Revision 1 — the
+   fourth pass had zero crossings but real quality problems the user
+   caught from the render: lines piercing card borders, up to 3 arrows
+   converging on one RPC node, a large empty vertical gap, off-grid
+   nodes, and an awkward long line). See PrivacyDataFlow.jsx's own
+   header comment for the full grid/anchor-margin/bus reasoning. Sits
+   between .privacy-page__lead and the first policy section,
+   illustrating (never replacing) the policy text.
+
+   BREAKOUT: this section deliberately escapes .privacy-page__inner's
+   68ch text measure (the standard vw-negative-margin "full-bleed
+   section inside a constrained article" technique) — a real node graph
+   needs meaningfully more than ~680px to stay legible with 7 nodes in
+   its widest row; the surrounding policy paragraphs stay at their own
+   readable measure regardless, only this one section is wider. */
+.privacy-flow7{width:100vw;margin-left:calc(50% - 50vw);margin-right:calc(50% - 50vw);margin-top:8px;margin-bottom:44px;padding:0 var(--gutter);display:flex;flex-direction:column;gap:20px;align-items:center}
+.privacy-flow7 > *{width:100%;max-width:1000px}
+
+.privacy-flow7__legend{display:flex;flex-wrap:wrap;gap:18px;justify-content:center;padding:12px 16px;border:1px solid var(--line);border-radius:var(--radius-sm);background:var(--glass)}
+.privacy-flow7__legend-item{display:inline-flex;align-items:center;gap:7px;font-size:11.5px;color:var(--muted)}
+.privacy-flow7__legend-swatch{width:12px;height:12px;border-radius:4px;flex:0 0 auto}
+.privacy-flow7__legend-swatch--plain{border:1px solid var(--line)}
+.privacy-flow7__legend-swatch--sent{background:var(--teal)}
+.privacy-flow7__legend-swatch--blocked{border:1px dashed var(--muted)}
+
+/* ---- Desktop: central-hub composition (Unlocked session as the
+   crossing point of a cross/plus layout — device north, actions/
+   destinations south, the separate dApp chain as an east arm) +
+   orthogonal SVG connectors. height:620px here MUST match CANVAS_H_PX
+   in PrivacyDataFlow.jsx — that constant is what the JS uses to compute
+   each card's real anchor margin (halfH), so a mismatch here silently
+   reintroduces the piercing-line bug an earlier pass already fixed once.
+   shape-rendering:geometricPrecision avoids the crisp-edge antialiasing
+   some browsers apply to short axis-aligned segments. ---- */
+.privacy-flow7__canvas{position:relative;width:100%;height:620px;margin-top:14px}
+.privacy-flow7__svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible;shape-rendering:geometricPrecision}
+.privacy-flow7__edge{fill:none;stroke:rgba(255,255,255,0.5);stroke-opacity:1;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke}
+
+/* ---- Device container: a titled, thin-outline box wrapping Vault,
+   Preferences, Local activity, and Session — the hub's north arm. Not a
+   node — Session's own outgoing bus line is expected to cross this
+   box's border at one clean point; only real node cards keep the "no
+   border pierced except at anchor" rule. ---- */
+.privacy-flow7__devicebox{position:absolute;border:1px solid var(--line);border-radius:var(--radius-sm);background:rgba(255,255,255,0.015);z-index:0}
+.privacy-flow7__devicebox-title{position:absolute;top:-9px;left:16px;padding:0 8px;background:#050505;font-family:var(--font-display);font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+
+.privacy-flow7__buslabel{position:absolute;transform:translate(-50%,6px);font-size:9px;color:var(--muted);white-space:nowrap;background:#050505;padding:0 6px;z-index:1}
+
+.privacy-flow7__node{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;text-align:center;gap:4px;width:108px;padding:10px 8px;border-radius:var(--radius-sm);transition:transform var(--dur-fast) var(--ease-out),border-color var(--dur-fast) var(--ease-out);z-index:1}
+.privacy-flow7__node--plain{border:1px solid var(--line);background:#0a0a0a}
+.privacy-flow7__node--sent{border:1px solid rgba(111,179,168,0.5);background:rgba(111,179,168,0.09)}
+.privacy-flow7__node--blocked{position:relative;transform:none;border:1px dashed var(--line);background:rgba(255,255,255,0.02);width:auto}
+.privacy-flow7__node:hover,.privacy-flow7__node:focus-visible{transform:translate(-50%,-50%) translateY(-2px)}
+.privacy-flow7__node--plain:hover{border-color:rgba(255,255,255,0.35)}
+.privacy-flow7__node--sent:hover{border-color:var(--teal)}
+.privacy-flow7__node--blocked:hover{transform:translateY(-2px)}
+
+/* Compact variant — the 4 RPC destination nodes only. Narrower
+   (52px vs. the standard 108px) because Custom token list/Broadcast
+   transaction/Read balances all converge onto these 4 nodes directly
+   below the action row's own left-hand span, which is narrower than a
+   full-width card row could fit without overlapping — see this
+   composition's own header comment in PrivacyDataFlow.jsx. */
+.privacy-flow7__node--compact{padding:7px 5px;gap:3px}
+.privacy-flow7__node--compact .privacy-flow7__node-icon{width:22px;height:22px}
+.privacy-flow7__node--compact .privacy-flow7__node-title{font-size:9.5px}
+
+.privacy-flow7__node-icon{width:26px;height:26px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+.privacy-flow7__node-icon .icon{width:13px;height:13px}
+.privacy-flow7__node-icon--plain{background:var(--glass);color:var(--muted)}
+.privacy-flow7__node-icon--sent{background:rgba(111,179,168,0.2);color:var(--teal)}
+.privacy-flow7__node-icon--blocked{background:rgba(255,255,255,0.04);color:var(--muted)}
+.privacy-flow7__node-icon--chain{background:rgba(255,255,255,0.08);width:28px;height:28px}
+.privacy-flow7__node-icon--chain img{width:16px;height:16px;border-radius:50%;display:block}
+.privacy-flow7__node--compact .privacy-flow7__node-icon--chain{width:22px;height:22px}
+.privacy-flow7__node--compact .privacy-flow7__node-icon--chain img{width:13px;height:13px}
+
+.privacy-flow7__node-title{font-family:var(--font-display);font-weight:600;font-size:10.5px;color:var(--ink);line-height:1.25}
+.privacy-flow7__node--blocked .privacy-flow7__node-title{color:var(--muted)}
+.privacy-flow7__node-desc{font-size:9px;color:var(--muted);line-height:1.35}
+
+/* ---- Never-happens: static row below the graph, no incoming/outgoing
+   edge — a short "severed" dashed stub terminating in a ✕ badge is the
+   ONLY connector-like element here, deliberately not reaching anything
+   (a cut line, not a card that's merely separate). ---- */
+.privacy-flow7__never{padding-top:18px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:12px;align-items:center}
+.privacy-flow7__never-title{font-family:var(--font-display);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin:0;text-align:center}
+.privacy-flow7__never-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:16px 12px;width:100%}
+.privacy-flow7__severed{position:absolute;top:-14px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center}
+.privacy-flow7__severed-line{width:1px;height:8px;background:repeating-linear-gradient(to bottom,var(--muted) 0 3px,transparent 3px 6px)}
+.privacy-flow7__severed-mark{margin-top:2px;width:15px;height:15px;border-radius:50%;background:rgba(0,0,0,0.4);border:1px solid var(--line);color:var(--muted);font-size:8.5px;line-height:13px;text-align:center}
+
+/* ---- Mobile fallback: simplified grouped-card layout, hidden on
+   desktop — a genuinely different (not reused/shrunk) markup tree. Now
+   THREE clusters (device / sent out / dApp flow) matching the hub's
+   three arms — the dApp arm reads as its own independent chain on
+   desktop, so it gets its own titled cluster here too. ---- */
+.privacy-flow7__mobile{display:none}
+.privacy-flow7__mcluster{display:flex;flex-direction:column;gap:10px}
+.privacy-flow7__mcluster--boxed{padding:14px 12px;border:1px solid var(--line);border-radius:var(--radius-sm);background:rgba(255,255,255,0.015)}
+.privacy-flow7__mcluster-title{font-family:var(--font-display);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin:0;text-align:center}
+.privacy-flow7__mtrunk{width:1px;height:22px;background:var(--line);margin:0 auto}
+.privacy-flow7__mgrid{display:grid;grid-template-columns:1fr;gap:10px}
+.privacy-flow7__mnode{display:flex;flex-direction:column;align-items:center;text-align:center;gap:5px;padding:12px 10px;border-radius:var(--radius-sm);width:100%;max-width:320px;margin:0 auto}
+.privacy-flow7__mnode--plain{border:1px solid var(--line);background:#0a0a0a}
+.privacy-flow7__mnode--sent{border:1px solid rgba(111,179,168,0.5);background:rgba(111,179,168,0.09)}
+.privacy-flow7__mnote{font-size:11px;color:var(--muted);line-height:1.6;text-align:center;max-width:52ch;margin:4px auto 0}
+
+@media (max-width:860px){
+  .privacy-flow7__canvas{display:none}
+  .privacy-flow7__mobile{display:flex;flex-direction:column;gap:24px}
+}
+
+/* Reveal stagger helpers */
+@keyframes spin-slow{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+.spin-slow{animation:spin-slow 12s linear infinite}

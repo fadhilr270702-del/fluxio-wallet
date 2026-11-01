@@ -1,0 +1,43 @@
+{
+  "name": "fluxio-wallet",
+  "private": true,
+  "license": "MIT",
+  "version": "0.0.0",
+  "description": "Fluxio Wallet monorepo",
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "admin",
+    "backend"
+  ],
+  "scripts": {
+    "dev": "pnpm --filter fluxio-web dev",
+    "build": "pnpm --filter fluxio-web build",
+    "dev:web": "pnpm --filter fluxio-web dev",
+    "dev:backend": "pnpm --filter backend dev",
+    "dev:admin": "pnpm --filter fluxio-admin dev",
+    "build:admin": "pnpm --filter fluxio-admin build",
+    "lint": "echo \"Add lint scripts\"",
+    "struktur:update": "node scripts/update-struktur-folder.js",
+    "archive:source": "node scripts/archive-source.mjs",
+    "publish:public": "node scripts/publish-public.mjs",
+    "test": "pnpm --filter @fluxio/crypto test && pnpm --filter @fluxio/services test && pnpm --filter @fluxio/utils test && pnpm --filter fluxio-extension test && pnpm --filter fluxio-admin test && pnpm --filter backend test && node --test scripts/test/publicSnapshotScan.test.mjs",
+    "test:crypto": "pnpm --filter @fluxio/crypto test",
+    "test:services": "pnpm --filter @fluxio/services test",
+    "test:utils": "pnpm --filter @fluxio/utils test",
+    "test:extension": "pnpm --filter fluxio-extension test",
+    "test:admin": "pnpm --filter fluxio-admin test",
+    "test:backend": "pnpm --filter backend test",
+    "build:extension": "pnpm --filter fluxio-extension build",
+    "build:extension:release": "pnpm --filter fluxio-extension build:release",
+    "package:extension": "pnpm --filter fluxio-extension package"
+  },
+  "devDependencies": {
+    "turbo": "^1.11.3"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  }
+}

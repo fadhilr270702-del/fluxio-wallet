@@ -1,0 +1,18 @@
+-- Mirrors migration 0010's own body_format precedent exactly, for the same
+-- reason: telegram_broadcasts.title can now be either raw plain text (every
+-- row created before this slice, and forever unless explicitly re-saved
+-- through Compose) or pre-sanitized Telegram-safe HTML (the title editor
+-- becoming a single-line rich-text field alongside Message). 'plain' rows
+-- are sent exactly as before (escaped via escapeHtmlText, no parse_mode
+-- forced just for the title alone); 'html' rows are sent through
+-- sanitizeTelegramHtml the same way body already is — see
+-- backend/src/telegram/formatting.js's updated buildBroadcastMessage() for
+-- the full title_format x body_format matrix. Every pre-existing row
+-- backfills to 'plain' via the DEFAULT below, so nothing about how they're
+-- sent changes.
+--
+-- Plain ADD COLUMN with a DEFAULT + CHECK on the new column only (not
+-- widening an existing constraint), so this runs through the default
+-- wrapped BEGIN/COMMIT path — no -- fluxio:manual-transaction marker
+-- needed, same as migrations 0009/0010's own body_format/buttons columns.
+ALTER TABLE telegram_broadcasts ADD COLUMN title_format TEXT NOT NULL DEFAULT 'plain' CHECK (title_format IN ('plain', 'html'));

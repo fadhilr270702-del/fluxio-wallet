@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fluxio Wallet - Setup</title>
+  <link rel="stylesheet" href="../shared/theme.css">
+  <style>
+    /* Page-specific: everything else (buttons, inputs, .error/.desc/.loading,
+       .address-label/.address-box) comes from ../shared/theme.css. */
+    body {
+      min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 32px;
+    }
+    .card {
+      width: 440px; max-width: 100%; background: var(--flx-surface); border: 1px solid var(--flx-border);
+      border-radius: var(--flx-radius-lg); padding: 32px;
+    }
+    .choices { display: flex; flex-direction: column; gap: 12px; }
+    .warning {
+      background: rgba(255, 107, 107, 0.12); border: 1px solid rgba(255, 107, 107, 0.4);
+      color: var(--flx-danger); border-radius: 10px; padding: 12px 14px; font-size: 0.82rem;
+      line-height: 1.5; margin-bottom: 16px;
+    }
+    .seed-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 16px; }
+    .seed-word {
+      background: var(--flx-surface-2); border: 1px solid var(--flx-border); border-radius: var(--flx-radius-sm); padding: 8px 10px;
+      font-size: 0.85rem; font-family: 'Courier New', monospace; display: flex; gap: 6px; align-items: baseline;
+    }
+    .seed-word .idx { color: var(--flx-text-faint); font-size: 0.72rem; min-width: 16px; }
+    /* Import-wallet grid (prompt 0125) — the same .seed-grid/.seed-word box
+       used to DISPLAY a freshly generated phrase (above) is reused as-is
+       for the outer grid/cell layout; only the two rules below are new,
+       derived from .seed-word specifically to turn its cell into an input
+       instead of static text. Page-scoped like the rest of this block
+       (prompt 0125 is scoped to apps/extension/onboarding/ only), not
+       added to ../shared/theme.css. */
+    .seed-word--input:focus-within { border-color: var(--flx-accent); }
+    .seed-word-field {
+      background: transparent; border: none; outline: none; padding: 0; margin: 0; width: 100%; min-width: 0;
+      color: var(--flx-text); font-family: 'Courier New', monospace; font-size: 0.85rem;
+    }
+    .verify-field { margin-bottom: 10px; }
+    .verify-field label { display: block; font-size: 0.78rem; color: var(--flx-text-muted); margin-bottom: 4px; }
+    .field-hint { color: var(--flx-text-muted); font-size: 0.78rem; margin: -4px 0 12px; }
+    .back-link { margin-top: 14px; text-align: center; }
+    .word-count-choices { display: flex; gap: 12px; margin-bottom: 12px; }
+    .word-count-choices button { flex: 1; }
+  </style>
+</head>
+<body>
+  <div class="card" id="app">
+    <div class="loading">Loading…</div>
+  </div>
+  <script src="onboarding.js" type="module"></script>
+</body>
+</html>

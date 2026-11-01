@@ -1,0 +1,35 @@
+{
+  "name": "@fluxio/crypto",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "description": "Wallet cryptographic core: BIP-39 mnemonics, SLIP-10/BIP-32 key derivation, encrypted vault and transaction signing primitives.",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./mnemonic": "./mnemonic.js",
+    "./derivation": "./derivation.js",
+    "./wallet": "./wallet.js",
+    "./encryption": "./encryption.js",
+    "./vault": "./vault.js",
+    "./storage": "./storage.js",
+    "./signer": "./signer/index.js",
+    "./rpc": "./rpc.js"
+  },
+  "dependencies": {
+    "@fluxio/constants": "workspace:*",
+    "bip39": "3.1.0",
+    "bs58": "6.0.0",
+    "ed25519-hd-key": "2.0.0",
+    "ethers": "6.17.0",
+    "tweetnacl": "1.0.3"
+  },
+  "devDependencies": {
+    "vitest": "3.2.4"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  }
+}

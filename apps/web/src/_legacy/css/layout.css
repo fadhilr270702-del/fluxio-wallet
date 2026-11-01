@@ -1,0 +1,30 @@
+body {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+main { flex: 1; }
+
+.dashboard-header,
+.onboarding {
+  padding-top: 32px;
+}
+
+.dashboard-header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.dashboard-header nav {
+  display: flex;
+  gap: 16px;
+}
+
+.dashboard-main {
+  padding: 40px 0;
+  display: grid;
+  gap: 32px;
+}

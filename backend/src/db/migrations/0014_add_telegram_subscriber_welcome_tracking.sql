@@ -1,0 +1,18 @@
+-- Tracks the most recent Telegram update_id for which a /start welcome
+-- reply was successfully sent to this subscriber (prompt 0135). NULL means
+-- "never welcomed" — true for every existing row after this migration
+-- runs, and for any brand-new subscriber's first INSERT (upsertFromStart's
+-- own statement never references this column, so SQLite applies no
+-- explicit default, which is NULL).
+--
+-- Deliberately keyed on update_id, not a boolean "has this chat ever been
+-- welcomed" flag: a permanent per-chat flag would wrongly suppress a
+-- legitimate new /start from someone who deleted their chat with the bot
+-- and started it again later (same chat_id, since a private chat's id is
+-- the user's own Telegram id and never changes) — see welcome.js's own
+-- shouldSendWelcome() for the exact comparison this column feeds.
+--
+-- A plain ADD COLUMN, no CHECK constraint touched — follows the default
+-- (BEGIN/COMMIT-wrapped) migration path, not the manual-transaction one
+-- 0008/0013 needed for a CHECK-widening table rebuild.
+ALTER TABLE telegram_subscribers ADD COLUMN last_welcomed_update_id INTEGER;

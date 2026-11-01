@@ -1,0 +1,18 @@
+-- Prompt 0233 (Telegram Ads attribution) — where this subscriber came
+-- from: the /start deep-link payload ("start parameter") carried by their
+-- FIRST /start, e.g. "ads_2026_10_a" for an ad campaign. NULL means
+-- organic (no payload, an invalid payload, or any subscriber who existed
+-- before this column) — true for every existing row after this migration
+-- runs, since upsertFromStart's INSERT is the only writer and its ON
+-- CONFLICT branch deliberately never touches this column (an existing
+-- organic subscriber who later taps an ad link stays organic: attribution
+-- may undercount ads, never overcount).
+--
+-- Only ever a short campaign label validated against the Telegram
+-- deep-link charset ([A-Za-z0-9_-]{1,64}) before it is stored — never
+-- anything wallet-related or personally identifying, keeping this table's
+-- "Telegram-platform identifiers only" guarantee intact.
+--
+-- A plain ADD COLUMN, no CHECK constraint touched — follows the default
+-- (BEGIN/COMMIT-wrapped) migration path, same as 0014 next to it.
+ALTER TABLE telegram_subscribers ADD COLUMN source TEXT NULL;

@@ -1,0 +1,13 @@
+-- Adds file_id-based image storage alongside the existing media_url column.
+-- New broadcasts (composed via the image-upload composer) store a Telegram
+-- file_id here after a one-time upload to a private storage chat (see
+-- config/env.js's TELEGRAM_STORAGE_CHAT_ID); media_url stays exactly as it
+-- was for every broadcast created before this migration, and keeps sending
+-- unchanged — see backend/src/telegram/formatting.js's resolvePhotoSource()
+-- for the one-line compatibility bridge (file_id wins if present, else the
+-- legacy URL, else no image).
+--
+-- Plain nullable ADD COLUMN, no CHECK involved, so this runs through the
+-- default wrapped BEGIN/COMMIT path — no -- fluxio:manual-transaction
+-- marker needed, same as migrations 0009/0010.
+ALTER TABLE telegram_broadcasts ADD COLUMN media_file_id TEXT;

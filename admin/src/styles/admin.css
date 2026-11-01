@@ -1,0 +1,811 @@
+/**
+ * Admin-only styling: sits on top of design.css's tokens/app-shell classes
+ * (.app-root, .sidebar, .navbar, .card, .btn, .stat-tile, ...). Nothing here
+ * redefines a token — only new component classes for things the marketing
+ * site never needed (data tables, forms, status pills, the login screen).
+ */
+
+/* Sidebar — admin has its own nav item list (Sidebar.jsx), reusing
+   .sidebar/.nav-item from design.css as-is. Disabled placeholder items get
+   a dedicated modifier since most of the sidebar is "coming soon" this
+   slice. */
+.nav-item--disabled{opacity:.45;cursor:default;pointer-events:none}
+.nav-item--disabled:hover{background:transparent}
+/* color uses --gold-600 (the contrast-safe accent variant, not the base
+   --gold) so the active item reads clearly as accented in both themes —
+   the token itself swaps value per theme (see design.css), no separate
+   [data-theme="dark"] override needed here.
+   Selector is .sidebar .nav-item.nav-item--active, not just
+   .nav-item--active — design.css's own .sidebar .nav-item{color:var(--muted)}
+   is a 2-selector rule (specificity 0,0,2,0), which beats a bare
+   1-selector .nav-item--active regardless of file/cascade order. This
+   selector (3 selectors, 0,0,3,0) clears that bar, and also clears
+   .sidebar .nav-item:hover's specificity (also 3), so hovering the
+   active item keeps the active teal instead of flashing to the hover
+   color — a deliberate, explicit tie-break rather than an accidental one. */
+.sidebar .nav-item.nav-item--active{background:var(--glass);color:var(--gold-600)}
+
+/* Sidebar brand header — logo image beside the wordmark (Sidebar.jsx). */
+.sidebar .brand{display:flex;align-items:center;gap:8px}
+
+/* Bot account switcher (prompt 0139) — the last thing in the sidebar,
+   pinned to its bottom edge via margin-top:auto (prompt 0189: the
+   half-built collapse toggle that used to sit below it, and used to own
+   that pin, was removed outright — sidebar is always 260px now). Styled
+   as a small account-picker list, not full nav-items: smaller text, no
+   icon-left-align matching .nav-item, an avatar-initial circle instead
+   (mirrors the top bar's own .avatar treatment for the admin's own
+   identity, rather than inventing a second avatar shape in the same app). */
+.bot-switcher{margin-top:auto;display:flex;flex-direction:column;gap:6px;width:100%;padding-top:8px;border-top:1px solid var(--line-glass)}
+.bot-switcher__item{
+  display:flex;align-items:center;gap:10px;padding:8px;border-radius:var(--radius-sm);
+  background:transparent;border:1px solid transparent;color:var(--muted);cursor:pointer;text-align:left;width:100%;
+  transition:background var(--dur-fast),border-color var(--dur-fast),color var(--dur-fast);
+}
+.bot-switcher__item:hover{background:var(--glass)}
+.bot-switcher__avatar{
+  width:28px;height:28px;border-radius:50%;flex-shrink:0;background:rgba(45,212,191,0.16);color:var(--gold-600);
+  display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:700;font-size:12px;
+}
+.bot-switcher__text{display:flex;flex-direction:column;min-width:0;flex:1}
+.bot-switcher__label{font-size:12.5px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bot-switcher__username{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bot-switcher__dot{width:8px;height:8px;border-radius:50%;background:var(--gold-600);flex-shrink:0}
+/* Active state — the trial bot uses the app's own everyday brand accent
+   (--gold/--gold-600, teal despite the name); the official bot deliberately
+   does NOT — an "official, be careful" signal has to read as visually
+   distinct from ordinary UI, which the brand's own everyday accent color
+   can't do by definition.
+   Prompt 0142 Revision 1 — LIGHT mode (the default rule below) now uses
+   the danger/error red family (--status-danger-600, same token
+   .form-error/.badge--critical etc. use) instead of amber: a thin amber
+   border/tint read as too close to the app's other everyday warning UI
+   (.badge--scheduled/--warning/--partial all still use amber, for genuine
+   in-progress states) to work as its OWN distinct "sends to real users"
+   signal once seen side by side. DARK mode keeps the original amber/
+   --status-warning(-600) treatment unchanged (see the [data-theme="dark"]
+   overrides below) — dark mode's own contrast/legibility for amber was
+   never in question, only light mode's now-changed default needed a
+   different color, not both. */
+.bot-switcher__item--active{background:var(--glass);border-color:var(--line-glass)}
+.bot-switcher__item--active .bot-switcher__label{color:var(--gold-600)}
+.bot-switcher__item--official.bot-switcher__item--active{border-color:rgba(192,57,43,0.4)}
+.bot-switcher__item--official.bot-switcher__item--active .bot-switcher__avatar{background:rgba(192,57,43,0.14);color:var(--status-danger-600)}
+.bot-switcher__item--official.bot-switcher__item--active .bot-switcher__label{color:var(--status-danger-600)}
+.bot-switcher__item--official.bot-switcher__item--active .bot-switcher__dot{background:var(--status-danger-600)}
+[data-theme="dark"] .bot-switcher__item--official.bot-switcher__item--active{border-color:rgba(219,176,87,0.4)}
+[data-theme="dark"] .bot-switcher__item--official.bot-switcher__item--active .bot-switcher__avatar{background:rgba(219,176,87,0.22);color:var(--status-warning-600)}
+[data-theme="dark"] .bot-switcher__item--official.bot-switcher__item--active .bot-switcher__label{color:var(--status-warning-600)}
+[data-theme="dark"] .bot-switcher__item--official.bot-switcher__item--active .bot-switcher__dot{background:var(--status-warning-600)}
+
+/* Official-mode banner (prompt 0139) — the "impossible to miss" signal
+   rendered once by AppShell.jsx above every page's own content, not a
+   redesign of the theme itself: same tokens as the switcher's own
+   official-mode accent above, just as a full-width strip rather than a
+   tinted sidebar row, since the switcher alone (always visible, but small,
+   in the sidebar) was judged not loud enough on its own for "sends to real
+   users" — the base prompt's own explicit ask for a second, distinct
+   signal beyond the switcher's accent color.
+   Prompt 0142 Revision 1 — same light-mode red / dark-mode amber split as
+   the switcher accent above, same reasoning (see that rule's own
+   comment); the light-mode background/border alphas (0.1/0.25) are
+   .form-error's own already-established danger-red values, reused rather
+   than invented, since this banner IS an error/warning-class signal in
+   the same family. Spacing: previously had no margin-top at all, sitting
+   flush against Navbar above it — margin-top:20px matches
+   .app-content's own existing top-of-page breathing room (design.css),
+   the same value this file already uses for "gap before this page's own
+   leading content" rather than a new number; margin-bottom raised from
+   16px to the same 20px so the gap to the page-head panel below reads as
+   deliberate on both sides, not tighter on one edge than the other. */
+.official-mode-banner{
+  background:rgba(192,57,43,0.1);border:1px solid rgba(192,57,43,0.25);color:var(--status-danger-600);
+  padding:10px 16px;border-radius:var(--radius-sm);font-size:13px;margin-top:20px;margin-bottom:20px;
+}
+[data-theme="dark"] .official-mode-banner{
+  background:rgba(219,176,87,0.16);border-color:rgba(219,176,87,0.4);color:var(--status-warning-600);
+}
+.official-mode-banner strong{letter-spacing:.04em}
+
+/* Top bar admin identity + logout, replacing the marketing navbar's search/
+   bell/connect-wallet actions. */
+.admin-user{display:flex;align-items:center;gap:10px;font-size:13.5px;color:var(--muted)}
+.admin-user__role{padding:3px 9px;border-radius:var(--radius-pill);background:var(--glass);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em}
+
+/* Avatar (replaces the long email text) + a pure-CSS hover/focus tooltip
+   revealing it — no JS state, see Navbar.jsx. */
+.avatar-wrap{position:relative;display:inline-flex}
+.avatar{
+  width:34px;height:34px;border-radius:50%;background:rgba(45,212,191,0.16);color:var(--gold-600);
+  display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:700;
+  font-size:12.5px;border:1px solid var(--line-glass);cursor:default;user-select:none;
+}
+.avatar-tooltip{
+  position:absolute;top:calc(100% + 8px);right:0;
+  background:var(--panel);color:var(--ink);border:1px solid var(--line-glass);box-shadow:var(--shadow-1);
+  padding:6px 10px;border-radius:8px;font-size:12px;white-space:nowrap;
+  opacity:0;visibility:hidden;transform:translateY(-4px);pointer-events:none;z-index:10;
+  transition:opacity var(--dur-fast) var(--ease-out),transform var(--dur-fast) var(--ease-out),visibility var(--dur-fast);
+}
+.avatar-wrap:hover .avatar-tooltip,
+.avatar-wrap:focus-visible .avatar-tooltip{opacity:1;visibility:visible;transform:translateY(0)}
+
+/* Page header used by every feature page (title + primary action) — now
+   also a glass card like .card/.stat-tile/etc (see the @supports block at
+   the end of this file for the actual translucent-blur effect; this base
+   rule is just the solid fallback, same role .card's own base rule plays).
+   Deliberately NOT setting `color` here the way .card does (.card's own
+   base rule sets color:var(--muted)) — .page-head has never set its own
+   color, so its <h1> inherits the page's normal full-contrast --ink;
+   .page-head__desc below already sets its own --muted independently.
+   Inheriting --muted here would quietly wash out the h1 title too. */
+.page-head{
+  display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:28px;flex-wrap:wrap;
+  padding:22px;border-radius:var(--radius);border:1px solid var(--line-glass);box-shadow:var(--shadow-1);background:var(--panel);
+}
+.page-head h1{margin-bottom:4px}
+.page-head__desc{color:var(--muted);font-size:var(--step--1);max-width:56ch}
+
+/* Prompt 0150 — the broadcast detail page's "← Back to history" link.
+   Reuses .view-broadcast-modal__detail-link's own treatment (muted,
+   underline-free, hover-to-ink) rather than inventing a new link style —
+   see that rule further down for the precedent. Scoped to this one class
+   (not a blanket .page-head__desc a) so no other page-head__desc usage
+   elsewhere in the panel is affected. */
+.broadcast-detail__back-link{text-decoration:none;transition:color var(--dur-fast)}
+.broadcast-detail__back-link:hover,
+.broadcast-detail__back-link:focus-visible{color:var(--ink)}
+
+/* Placeholder "coming soon" feature pages. */
+.coming-soon{display:flex;flex-direction:column;align-items:flex-start;gap:8px;padding:40px 32px;color:var(--muted)}
+.coming-soon .icon{width:32px;height:32px;color:var(--gold-600);margin-bottom:6px}
+
+/* Toolbar above the announcements table: filters + "New announcement". */
+.toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap}
+.toolbar__filters{display:flex;gap:8px;flex-wrap:wrap}
+
+/* Data table */
+.table-wrap{overflow-x:auto;border-radius:var(--radius);border:1px solid var(--line-glass);background:var(--panel);box-shadow:var(--shadow-1)}
+.data-table{width:100%;border-collapse:collapse;font-size:13.5px}
+.data-table th,.data-table td{padding:12px 16px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+.data-table th{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600;background:var(--glass)}
+.data-table tbody tr:last-child td{border-bottom:none}
+.data-table tbody tr:hover{background:var(--glass)}
+.data-table__title{font-weight:600;color:var(--ink)}
+.data-table__meta{color:var(--muted);font-size:12px;margin-top:2px}
+/* nowrap, not wrap — with 3 buttons (Publish/Unpublish, Edit, Delete) in a
+   narrow last column, `wrap` let them break onto a second, independently
+   right-aligned line (Edit/Delete visibly "menumpuk"/misaligned under the
+   first button). table-wrap's own overflow-x:auto handles a genuinely
+   too-narrow viewport by scrolling instead. Safe for this class's other
+   two consumers (Broadcast History, Admins) — at most 2 short buttons
+   there, never actually wrapped. */
+.data-table__actions{display:flex;gap:6px;flex-wrap:nowrap;justify-content:flex-end}
+.data-table__empty{padding:40px 16px;text-align:center;color:var(--muted)}
+
+/* Small action buttons inside table rows — same family as .btn, smaller. */
+.btn-sm{padding:6px 11px;font-size:12.5px;border-radius:8px}
+.btn-danger{border-color:transparent;background:transparent;color:var(--status-danger-600)}
+.btn-danger:hover{background:rgba(192,57,43,0.1);border-color:transparent}
+
+/* Status / level pills (see Badge.jsx) */
+.badge{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:var(--radius-pill);font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap}
+.badge--draft{background:var(--glass);color:var(--muted)}
+.badge--published{background:rgba(111,179,168,0.18);color:var(--teal)}
+[data-theme="dark"] .badge--published{color:var(--teal-300)}
+.badge--info{background:rgba(111,179,168,0.16);color:var(--teal)}
+/* --status-warning(-600), not --gold(-600) — deliberately decoupled from
+   the brand accent so a "warning/in-progress" badge doesn't shift color
+   (and collapse visually into the "success" --teal badges above) just
+   because the brand accent was rebranded from gold to teal. Same old
+   amber values as before. */
+.badge--warning{background:rgba(219,176,87,0.22);color:var(--status-warning-600)}
+.badge--critical{background:rgba(192,57,43,0.14);color:var(--status-danger-600)}
+
+/* Telegram broadcast statuses (see features/broadcast/telegram/). Every
+   status gets its own distinct, meaningful color so a broadcast's state
+   reads at a glance — completed~success(teal, this system's established
+   "success" hue, no green token exists), scheduled~warning(amber),
+   sending/queued~info(blue, "in progress"), canceled/failed~critical(red).
+   partial stays amber (still-needs-attention), same as warning. */
+.badge--queued{background:rgba(74,143,192,0.18);color:var(--status-info-600)}
+.badge--sending{background:rgba(74,143,192,0.18);color:var(--status-info-600)}
+.badge--completed{background:rgba(111,179,168,0.18);color:var(--teal)}
+[data-theme="dark"] .badge--completed{color:var(--teal-300)}
+.badge--partial{background:rgba(219,176,87,0.22);color:var(--status-warning-600)}
+.badge--failed{background:rgba(192,57,43,0.14);color:var(--status-danger-600)}
+/* Scheduled — the real amber/warning tokens (--status-warning-600), same as
+   .badge--warning/.badge--partial above. Previously wired to --gold-600,
+   which the teal rebrand repointed from actual gold to a teal shade —
+   scheduled was silently rendering as a teal badge, indistinguishable from
+   completed. Fixed to use the tokens deliberately kept amber through the
+   rebrand for exactly this purpose (see design.css's own comment on them). */
+.badge--scheduled{background:rgba(219,176,87,0.22);color:var(--status-warning-600)}
+/* Canceled — red, same as failed/critical. Previously deliberately kept
+   neutral-gray ("a deliberate admin action, not an error state") — revised
+   on explicit request so every status has a distinct, meaningful color. */
+.badge--canceled{background:rgba(192,57,43,0.14);color:var(--status-danger-600)}
+/* Recurring (prompt 0134) — a genuinely new, ongoing/live state, not a
+   variant of any existing one, so it gets a color none of the above use:
+   --gold/--gold-600 were considered first but are actually the SAME teal
+   hue family as --teal (a leftover name from before the teal rebrand — see
+   CLAUDE.md) and would have read as visually indistinguishable from
+   completed/published. A violet accent (not used anywhere else in this
+   admin app) instead, matching this file's own established light/dark
+   pairing pattern (a base hue for light mode, a lighter tint for dark). */
+.badge--recurring{background:rgba(124,58,237,0.16);color:#7c3aed}
+[data-theme="dark"] .badge--recurring{color:#c4b5fd}
+
+/* Forms (login + announcement create/edit) */
+.form-card{max-width:640px}
+.form-grid{display:flex;flex-direction:column;gap:16px}
+.form-row{display:flex;gap:16px;flex-wrap:wrap}
+.form-row > .field{flex:1;min-width:180px}
+.field{display:flex;flex-direction:column;gap:6px}
+.field label{font-size:12.5px;font-weight:600;color:var(--muted)}
+.field input,.field select,.field textarea{
+  font-family:var(--font-body);font-size:14px;padding:10px 12px;border-radius:var(--radius-sm);
+  border:1px solid var(--line);background:var(--bg);color:var(--ink);width:100%;
+  transition:border-color var(--dur-fast);
+}
+.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--gold)}
+.field textarea{resize:vertical;min-height:140px;font-family:var(--font-body)}
+/* Custom select arrow (prompt 0132 Revision 5) — the browser's own native
+   arrow sat right against the field's own border with barely any margin.
+   `appearance:none` (+ vendor-prefixed variants for older engines) strips
+   ALL native chrome, including that arrow, so it's replaced with a small
+   chevron `background-image`, positioned with real breathing room
+   (`right 14px center`) and `padding-right` widened so text never runs
+   under it. This is a shared rule (`.field select`, same as the input/
+   textarea rule above) — it applies to EVERY select in an admin `.field`
+   wrapper, not just Compose's own Target/When (see this prompt's own
+   archive for the full affected-locations list, checked via grep before
+   writing this rule, not assumed). `appearance:none` only strips native
+   VISUAL chrome — click-to-open, keyboard navigation/typeahead, and the
+   existing `:focus{border-color:var(--gold)}` rule immediately above are
+   all untouched, still native <select> behavior underneath.
+   Two theme-scoped background-image declarations (not one), because the
+   arrow is an embedded SVG data URI — the SVG's own `stroke` attribute is
+   a hardcoded value baked into that URI string, not a live CSS custom
+   property a data URI can reference; each theme's declaration bakes in
+   that theme's actual --ink hex (light: --slate #273f48, dark: --paper
+   #faf7f0) at a stroke-opacity approximating --muted's own alpha (0.65
+   light / 0.62 dark, matching --ink-muted/--muted's real alpha values) —
+   simpler and more broadly compatible than trying to get mask-image
+   working as a decorative background layer on a native form control
+   (mask-image affects a whole element's own paint, not an extra layer you
+   can composite behind/beside real content the way background-image can). */
+/* DEAD-COPY WARNING (prompt 0132 Revision 6): '%23273f48'/'%23faf7f0' below
+   are baked-in hex copies of --ink's own light/dark values (see the long
+   comment above for why a data URI can't reference the live custom
+   property instead) — if --ink is ever changed, these two SVGs' own
+   stroke colors must be updated by hand to match, or the arrow will
+   silently drift out of sync with every other --ink-colored element. */
+.field select{
+  appearance:none;-webkit-appearance:none;-moz-appearance:none;
+  background-repeat:no-repeat;background-position:right 14px center;background-size:13px 13px;
+  padding-right:36px;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23273f48' stroke-opacity='0.65' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+}
+[data-theme="dark"] .field select{
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23faf7f0' stroke-opacity='0.62' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+}
+.field-hint{font-size:11.5px;color:var(--muted)}
+/* Prompt 0136 — the Welcome tab's live character counter turns this color
+   once over the applicable Telegram limit (1024 with an image, 4096
+   without); same red as .form-error — as of prompt 0142 Revision 1, the
+   same actual token too (--status-danger-600), not just a matching hex. */
+.field-hint--error{color:var(--status-danger-600)}
+/* Prompt 0139 — the "media disabled for this bot" disclosure on Compose's
+   image/video pickers; same amber tokens as the official-mode banner/
+   switcher accent, not a new color, so it reads as part of the same
+   "official bot" signal family rather than a generic warning. */
+.field-hint--warning{color:var(--status-warning-600)}
+.form-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:4px}
+
+/* Prompt 0171 — AnnouncementForm's collapsible "Display schedule" section.
+   Same disclosure TECHNIQUE as the existing .emoji-pack-card__header
+   pattern (prompt 0152, EmojiLibraryPage.jsx) — a real <button> carrying
+   aria-expanded, with its own chevron rotated via the
+   [aria-expanded="true"] sibling selector, no JS-driven inline transform
+   — reused deliberately rather than inventing a new interaction pattern;
+   only the visual layout (title + right-aligned summary + chevron, one
+   row, no card meta/actions) is new, since this section's own content
+   shape differs from an emoji pack card's. `.card` supplies the
+   background/border/radius/shadow already; `padding:0` here lets the
+   header button and panel each control their own padding, same reason
+   .emoji-pack-card does the same. */
+.announcement-schedule{padding:0}
+.announcement-schedule__header{
+  width:100%;display:flex;align-items:center;gap:12px;padding:14px 16px;
+  background:none;border:none;text-align:left;cursor:pointer;color:inherit;font:inherit;
+}
+.announcement-schedule__title{font-size:13px;font-weight:600;flex:0 0 auto}
+.announcement-schedule__summary{
+  flex:1;min-width:0;text-align:right;font-size:12.5px;color:var(--muted);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.announcement-schedule__chevron{flex:0 0 auto;font-size:14px;color:var(--muted);transition:transform var(--dur-fast)}
+.announcement-schedule__header[aria-expanded="true"] .announcement-schedule__chevron{transform:rotate(180deg)}
+.announcement-schedule__panel{padding:0 16px 16px;border-top:1px solid var(--line);padding-top:16px}
+
+/* Modal.jsx — minimal reusable overlay+card dialog, used by the reschedule
+   dialog, the Compose overwrite-confirm dialog, and the View broadcast
+   modal (prompt 0132). Deliberately no animation/portal library.
+
+   3-region flex-column layout (prompt 0132 Revision 3) — see Modal.jsx's
+   own comment for the full reasoning (why flex over position:sticky, why
+   this is the smallest change for existing call sites). .modal-card caps
+   its own height so it can never grow past the viewport (with a little
+   breathing room either side); .modal-card__body is the ONLY scrolling
+   region (min-height:0 is what actually lets a flex child shrink below its
+   content's natural height — without it this rule would do nothing and
+   the whole card would just keep growing past max-height instead);
+   .modal-card__head/.modal-card__footer both stay put via flex:0 0 auto. */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;padding:20px;z-index:100}
+.modal-card{width:100%;max-width:420px;max-height:calc(100vh - 48px);padding:24px;display:flex;flex-direction:column}
+.modal-card__head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;flex:0 0 auto}
+.modal-card__head h2{font-size:var(--step-1);margin:0}
+/* Scrollbar hidden cross-browser (prompt 0132 Revision 4) — scroll itself
+   is completely unaffected by any of this (wheel/trackpad/touch/keyboard
+   all still scroll `overflow-y:auto` normally); only the visible scrollbar
+   track/thumb is suppressed. Scoped to this exact class only, never a
+   blanket rule — tables/pages elsewhere keep their normal scrollbars. */
+.modal-card__body{overflow-y:auto;flex:1 1 auto;min-height:0;scrollbar-width:none;-ms-overflow-style:none}
+.modal-card__body::-webkit-scrollbar{display:none}
+
+/* "More content below" fade (prompt 0132 Revision 4) — a real overlay
+   element, not a background trick. A first attempt painted the fade as a
+   background-image on `.modal-card__body` itself (two layers, one
+   `attachment:local`/one `attachment:scroll` — the classic "pure-CSS
+   scroll shadow" technique) and was caught, via an actual screenshot, not
+   working: this modal's own children (the message box, media previews,
+   buttons) each paint their OWN opaque/near-opaque background, and a CSS
+   background on the scrolling container is always painted BEHIND its
+   children, never in front — so the fade was invisible wherever a child
+   happened to sit at the bottom edge, which in this form-shaped content is
+   most of the time. Only a real stacked-on-top element can paint over
+   arbitrary child content, hence the small amount of JS in Modal.jsx
+   (`showFade` state, a scroll listener + ResizeObserver) driving this
+   `.modal-card__fade` div instead. `.modal-card__body-wrap` establishes
+   the positioning context; the fade div is absolutely positioned over the
+   body (later in DOM order than the body node, so it paints on top),
+   `pointer-events:none` so it never blocks scrolling/clicking, and a plain
+   opacity transition for a soft appear/disappear rather than a hard cut.
+   Color: var(--modal-fade-color) (design.css), a purpose-built theme token
+   — NOT var(--glass-panel-bg). An earlier version reused that token and
+   was measured (an isolated on/off pixel diff at identical scroll/content
+   state, not eyeballed) to be nearly invisible: avg channel diff ~6.8/255
+   in light mode, since --glass-panel-bg's alpha was tuned for a panel tint
+   over an already-blurred image, not for a legible scroll indicator. See
+   --modal-fade-color's own comment (design.css) for the color reasoning
+   per theme (a dark shadow reads as depth against light surfaces; a light
+   glow reads against dark ones — opposite directions, which is exactly why
+   this needed its own token rather than reusing --glass-panel-bg's). */
+.modal-card__body-wrap{position:relative;flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
+.modal-card__fade{
+  position:absolute;left:0;right:0;bottom:0;height:32px;pointer-events:none;
+  background:linear-gradient(to bottom,transparent,var(--modal-fade-color));
+  opacity:0;transition:opacity var(--dur-fast) var(--ease-out);
+}
+.modal-card__fade--visible{opacity:1}
+.modal-card__footer{flex:0 0 auto;margin-top:16px}
+
+/* Telegram broadcast composer — media picker (replaces the old Media URL
+   text input; shared by both the Image and Video sections, video-upload
+   slice). Preview is capped at a modest height so a huge file doesn't blow
+   out the form layout; actions reuse .btn/.btn-sm. */
+.image-picker{display:flex;flex-direction:column;gap:10px;align-items:flex-start}
+.image-picker__preview{max-width:100%;max-height:160px;border-radius:var(--radius-sm);border:1px solid var(--line);display:block}
+.image-picker__preview--video{background:#000}
+.image-picker__placeholder{
+  display:flex;align-items:center;gap:8px;padding:10px 12px;border:1px dashed var(--line);border-radius:var(--radius-sm);
+  color:var(--muted);font-size:13px;background:var(--glass);
+}
+.image-picker__actions{display:flex;gap:8px}
+/* Shown on the section for whichever media type ISN'T currently attached —
+   explains why its "Choose" button is disabled rather than just greying it
+   out unexplained (mutual exclusivity: image OR video, never both). */
+.image-picker__disabled-note{font-size:11.5px;color:var(--muted)}
+
+/* Telegram broadcast composer — rich text editor (RichTextEditor.jsx).
+   Wrapper mirrors .field textarea's own border/radius/background so it
+   sits visually consistent with the rest of the form; the toolbar is a
+   top strip, the editable area (TipTap's own .ProseMirror class) reuses
+   the same min-height/padding textarea had. */
+.rich-text-editor{border:1px solid var(--line);border-radius:var(--radius-sm);background:var(--bg);overflow:hidden;transition:border-color var(--dur-fast)}
+.rich-text-editor:focus-within{border-color:var(--gold)}
+.rich-text-editor__toolbar{display:flex;gap:2px;padding:6px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.rich-text-editor__btn{
+  min-width:30px;height:30px;padding:0 8px;border:1px solid transparent;border-radius:8px;background:transparent;
+  color:var(--ink);cursor:pointer;font-size:14px;display:inline-flex;align-items:center;justify-content:center;
+  transition:background var(--dur-fast),border-color var(--dur-fast);
+}
+.rich-text-editor__btn .icon{width:16px;height:16px}
+.rich-text-editor__btn:hover{background:var(--glass)}
+.rich-text-editor__btn.is-active{background:rgba(45,212,191,0.16);border-color:rgba(45,212,191,0.4);color:var(--gold-600)}
+.rich-text-editor__content .ProseMirror{
+  padding:10px 12px;min-height:140px;font-family:var(--font-body);font-size:14px;color:var(--ink);outline:none;
+}
+.rich-text-editor__content .ProseMirror p{margin:0 0 0.6em 0}
+.rich-text-editor__content .ProseMirror p:last-child{margin-bottom:0}
+.rich-text-editor__content .ProseMirror a{color:var(--gold-600);text-decoration:underline}
+
+/* Read-only mode (prompt 0132 Revision 1, the "View broadcast" modal) — no
+   toolbar (see RichTextEditor.jsx), no min-height reserved for typing, and
+   no text caret, since nothing here is ever editable. */
+.rich-text-editor--readonly .rich-text-editor__content .ProseMirror{min-height:0;cursor:default;caret-color:transparent}
+
+/* Prompt 0196 — singleLine mode (the Title fields): a one-line box, not the
+   140px multi-line area Message keeps. 43px = the measured single line
+   (14px text × 1.65 line-height = 23.1px) + the 10px top/bottom padding. */
+.rich-text-editor--single-line .rich-text-editor__content .ProseMirror{min-height:43px}
+
+/* Prompt 0150 — the broadcast detail page reuses RichTextEditor(readOnly)
+   to render a stored body (see BroadcastDetailPage.jsx's own comment on
+   why), but unlike ViewBroadcastModal — which deliberately wants its
+   read-only Message field to still look like a frozen form field — the
+   detail page's body sits directly in a plain content card, not a form.
+   This strips the editor's own box chrome (border/background/padding)
+   down to plain flowing text so it blends into the page, without touching
+   .rich-text-editor/.rich-text-editor--readonly themselves (which
+   ViewBroadcastModal still relies on unchanged). */
+.broadcast-detail__body .rich-text-editor{border:none;border-radius:0;background:transparent;overflow:visible}
+.broadcast-detail__body .rich-text-editor__content .ProseMirror{padding:0}
+
+/* Telegram broadcast composer — optional inline URL buttons. One row per
+   button (see CLAUDE.md's inline URL buttons slice); each row's text/url
+   inputs reuse .field's own input styling, just laid out horizontally. */
+.button-rows{display:flex;flex-direction:column;gap:10px}
+.button-rows__row{display:flex;gap:10px;align-items:flex-start}
+.button-rows__row .field{flex:1}
+.button-rows__remove{flex:0 0 auto;margin-top:2px}
+
+/* Prompt 0153 — the small "premium icon" control on one button row. */
+.button-rows__icon-control{display:flex;align-items:center;gap:6px;flex:0 0 auto;margin-top:2px}
+.button-rows__icon-control .field-hint{white-space:nowrap}
+.button-rows__add{align-self:flex-start}
+
+/* Prompt 0152 — the Premium Emoji tab's pack list + expandable emoji grid. */
+.emoji-pack-list{display:flex;flex-direction:column;gap:12px}
+.emoji-pack-card{padding:0;overflow:hidden}
+.emoji-pack-card__header{
+  display:flex;align-items:center;gap:16px;width:100%;padding:16px;background:none;border:none;
+  text-align:left;cursor:pointer;color:inherit;font:inherit;
+}
+.emoji-pack-card__title{display:flex;flex-direction:column;gap:2px;min-width:0}
+.emoji-pack-card__title strong{font-size:var(--step--1)}
+.emoji-pack-card__meta{display:flex;flex-direction:column;gap:2px;margin-left:auto;text-align:right;flex:0 0 auto}
+.emoji-pack-card__chevron{
+  flex:0 0 auto;font-size:14px;color:var(--muted);transition:transform var(--dur-fast);
+}
+.emoji-pack-card__header[aria-expanded="true"] .emoji-pack-card__chevron{transform:rotate(180deg)}
+.emoji-pack-card__actions{display:flex;gap:8px;padding:0 16px 16px}
+.emoji-pack-card__grid-wrap{padding:0 16px 16px;border-top:1px solid var(--line);padding-top:16px}
+.emoji-grid{display:flex;flex-wrap:wrap;gap:8px}
+
+/* One tile — static or animated — sized by its own `size` prop via inline
+   style; this rule only supplies the shared box/centering look. The
+   placeholder is a plain muted box shown until the real thumbnail/
+   animation is ready (see PremiumEmojiStatic/PremiumEmojiAnimated's own
+   lazy-load + concurrency-cap strategy for why "ready" can take a moment,
+   deliberately). */
+.premium-emoji{
+  display:inline-flex;align-items:center;justify-content:center;position:relative;
+  border-radius:var(--radius-sm);background:var(--bg);overflow:hidden;flex:0 0 auto;
+}
+.premium-emoji img,.premium-emoji video,.premium-emoji__lottie{display:block;width:100%;height:100%;object-fit:contain}
+.premium-emoji__placeholder{display:block;width:100%;height:100%;background:var(--line)}
+.premium-emoji__error{font-size:14px;line-height:1}
+
+/* Prompt 0153 — the premiumEmoji TipTap node's own inline wrapper, sized
+   to sit on the text baseline like a real inline emoji character rather
+   than a floating block. `.is-selected` gets a faint outline so it's
+   visibly selectable/deletable, matching how a selected inline atom node
+   conventionally reads in a rich text editor. `__fallback-text` (the
+   "lookup failed" state) is deliberately unstyled beyond sizing — it's
+   meant to read as ordinary text, not a broken-asset indicator. */
+.premium-emoji-node{display:inline-flex;vertical-align:middle;line-height:1}
+.premium-emoji-node.is-selected .premium-emoji,.premium-emoji-node.is-selected .premium-emoji-node__fallback-text{
+  outline:2px solid var(--gold);outline-offset:1px;border-radius:var(--radius-sm);
+}
+.premium-emoji-node__fallback-text{font-size:1em}
+
+/* Prompt 0147 — wraps a plain <input> (Title, a button-row's own "Button
+   text") with its EmojiPickerButton trigger, laid out beside it rather
+   than inside it (an emoji-mart popover needs its own click target, not
+   an absolutely-positioned overlay glyph competing with real text input).
+   The input keeps .field input's own full-width styling untouched; only
+   the trigger button is a fixed-size sibling. */
+.input-with-emoji{display:flex;gap:6px;align-items:stretch}
+.input-with-emoji input{flex:1;min-width:0}
+.input-with-emoji .icon-btn{flex:0 0 auto;padding:0 10px}
+
+/* Prompt 0159 — the textarea equivalent: a plain <textarea> (Announcements'
+   Body, Versions' per-platform Update message) has no natural place for a
+   fixed-size trigger BESIDE it the way a single-line <input> does (an
+   align-items:stretch sibling would end up as tall as the whole textarea,
+   looking like a second textarea rather than a button) — instead, the
+   trigger sits inline with the field's own <label>, right-aligned via
+   space-between, with the textarea unchanged on its own line below. */
+.field-label-row{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.field-label-row label{margin:0}
+.field-label-row .icon-btn{flex:0 0 auto;padding:0 8px}
+
+/* The emoji-mart popover itself — rendered through a React portal straight
+   to document.body (see EmojiPickerButton.jsx's own comment for why:
+   .card's backdrop-filter and .rich-text-editor's overflow:hidden are both
+   real position:fixed/clipping hazards this sidesteps by construction).
+   Reuses .card for the same glass panel background/border/shadow every
+   other floating panel (Modal) already has, so emoji-mart's own default
+   chrome doesn't visually clash with the rest of this app — only sizing/
+   position/z-index are added here. z-index matches .modal-overlay's own
+   100, since this is conceptually the same "floats above everything"
+   layer, not layered under/over any specific existing element. */
+.emoji-picker-popover{position:fixed;z-index:100;padding:4px;width:352px;max-width:calc(100vw - 24px);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow-1);}
+.emoji-picker-popover__loading{padding:24px;text-align:center;color:var(--muted);font-size:13px;min-height:120px;display:flex;align-items:center;justify-content:center}
+
+/* Prompt 0153 — the Standard/Premium tab strip inside the popover, and the
+   Premium tab's own content (search + per-pack grid). A touch taller than
+   the plain emoji-mart popover (420px vs its own ~380px) since a
+   registered pack's title needs its own line above each grid row. */
+.emoji-picker-popover--premium{width:340px}
+.emoji-picker-popover__tabs{display:flex;gap:2px;padding:4px 4px 0;border-bottom:1px solid var(--line);margin-bottom:4px}
+.emoji-picker-popover__tab{
+  flex:1;padding:8px;border:none;background:none;border-radius:var(--radius-sm) var(--radius-sm) 0 0;
+  color:var(--muted);font-size:13px;cursor:pointer;transition:color var(--dur-fast),background var(--dur-fast);
+}
+.emoji-picker-popover__tab.is-active{color:var(--ink);background:var(--bg);font-weight:600}
+.premium-emoji-picker{display:flex;flex-direction:column;height:380px}
+.premium-emoji-picker__search{margin:4px 6px 8px;padding:8px 10px;border:1px solid var(--line);border-radius:var(--radius-sm);background:var(--bg);color:var(--ink);font-size:13px}
+.premium-emoji-picker__scroll{flex:1;overflow-y:auto;padding:0 6px 6px}
+.premium-emoji-picker__pack{margin-bottom:12px}
+.premium-emoji-picker__pack-title{font-size:12px;color:var(--muted);margin-bottom:6px;padding:0 2px}
+.premium-emoji-picker__grid{display:flex;flex-wrap:wrap;gap:4px}
+.premium-emoji-picker__tile{
+  padding:2px;border:none;background:none;border-radius:var(--radius-sm);cursor:pointer;
+  transition:background var(--dur-fast);
+}
+.premium-emoji-picker__tile:hover{background:var(--line)}
+.premium-emoji-picker__loading,.premium-emoji-picker__empty{padding:24px 16px;text-align:center;color:var(--muted);font-size:13px}
+.premium-emoji-picker__empty a{color:var(--gold-600)}
+
+/* "Broadcast terakhir" — prompt 0132, the 5-most-recent cards under the
+   Compose form (create mode only). auto-fit/minmax mirrors .stat-row's own
+   existing grid pattern in design.css (same gap, same responsive
+   collapse-to-1-column behavior at narrow widths — no new grid convention
+   invented). Card itself just uses the shared .card class, so it already
+   picks up the glass background/blur from the @supports block above
+   (--glass-panel-bg/--glass-blur) automatically — no separate panel style
+   needed or wanted here. */
+.recent-broadcasts{margin-top:24px}
+.recent-broadcasts__heading{font-size:var(--step-0);font-weight:600;margin:0 0 12px 0}
+.recent-broadcasts__grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
+.recent-broadcast-card{display:flex;flex-direction:column;gap:10px;padding:18px}
+.recent-broadcast-card__head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.recent-broadcast-card__title{font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.recent-broadcast-card__excerpt{margin:0;font-size:13px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+/* Recurring running tally (prompt 0134) — same violet as .badge--recurring
+   so the two visually read as "part of the same feature" at a glance. */
+.recent-broadcast-card__recurring{margin:0;font-size:12px;font-weight:600;color:#7c3aed}
+[data-theme="dark"] .recent-broadcast-card__recurring{color:#c4b5fd}
+.recent-broadcast-card__meta{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:12px;color:var(--muted)}
+.recent-broadcast-card__badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:999px;background:var(--glass);color:var(--ink)}
+.recent-broadcast-card__badge .icon{width:13px;height:13px}
+.recent-broadcast-card__meta-item{white-space:nowrap}
+.recent-broadcast-card__actions{margin-top:auto;padding-top:4px;display:flex;gap:8px}
+
+/* "View broadcast" modal (prompt 0132 Revision 1) — widened via Modal.jsx's
+   new optional className hook since it mirrors the full Compose form
+   layout (.form-grid/.field/label, same as ComposePage.jsx itself), not a
+   short confirmation. __static is this modal's own read-only stand-in for
+   an <input>'s value — same label/spacing rhythm as a real field, just a
+   plain paragraph instead of a form control, since nothing here is editable. */
+.view-broadcast-modal{max-width:640px}
+/* Real media preview (prompt 0132 Revision 2, height reduced in Revision
+   3) — capped to ~320px (roughly 40% of a typical modal's own capped
+   height, per that revision's own request) so a large image/video always
+   leaves enough room for the rest of the frozen form to be reachable
+   within Modal.jsx's own scrollable body, rather than needing to consume
+   most of the modal's height by itself. width:100% + object-fit:contain
+   already centers the actual pixels within that box on both axes (the
+   spec's own default object-position) and lets `background` show through
+   as a neutral letterbox when the real aspect ratio doesn't fill it —
+   already true before Revision 3, just reconfirmed rather than reinvented. */
+.view-broadcast-modal__media{display:block;width:100%;max-height:320px;object-fit:contain;border-radius:var(--radius-sm);background:var(--glass)}
+.view-broadcast-modal__static{margin:0;padding:8px 0;color:var(--ink)}
+/* Own class, NOT a reuse of .recent-broadcast-card__recurring (prompt
+   0134) — that class is declared earlier in this file, so combining it
+   with .view-broadcast-modal__static on the same element would have had
+   .view-broadcast-modal__static's own later `color:var(--ink)` win the
+   cascade (equal specificity, later source order), silently overriding the
+   intended violet tint back to plain ink. A dedicated class sidesteps that
+   entirely rather than fixing it with a more-specific combinator selector. */
+.view-broadcast-modal__recurring{margin:0;padding:8px 0;font-weight:600;color:#7c3aed}
+[data-theme="dark"] .view-broadcast-modal__recurring{color:#c4b5fd}
+/* margin-top removed in Revision 3 — this row now lives in Modal.jsx's own
+   .modal-card__footer (passed via the new `footer` prop), which already
+   supplies the same top gap; keeping this rule's own margin too would have
+   just doubled it. */
+.view-broadcast-modal__actions{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.view-broadcast-modal__actions-right{display:flex;gap:10px}
+/* Underline removed (prompt 0132 Revision 5) — a plain underline against
+   this link's own small 13px size read as visual clutter. Clickability is
+   signaled instead by a hover color shift to --ink (this app's own
+   established link-hover pattern — see e.g. .mkt-footer__col a:hover in
+   design.css, same "no underline, color deepens on hover" idiom), plus the
+   link still sits alongside a Close/"Salin ke form" button pair, giving it
+   clear context as an actionable row even at rest. */
+.view-broadcast-modal__detail-link{font-size:13px;color:var(--muted);text-decoration:none;transition:color var(--dur-fast)}
+.view-broadcast-modal__detail-link:hover{color:var(--ink)}
+
+.form-error{padding:10px 14px;border-radius:var(--radius-sm);background:rgba(192,57,43,0.1);color:var(--status-danger-600);font-size:13px;border:1px solid rgba(192,57,43,0.25)}
+
+/* Added in prompt 0132 (Broadcast Compose's post-send inline notice) —
+   this system has no "success" hue distinct from .badge--completed/
+   .badge--published's own established one (--teal/--teal-300, see this
+   file's own comment on .badge--completed above: "no green token exists").
+   Mirrors .form-error's box model exactly, teal instead of red. */
+.form-success{padding:10px 14px;border-radius:var(--radius-sm);background:rgba(111,179,168,0.18);color:var(--teal);font-size:13px;border:1px solid rgba(111,179,168,0.35)}
+[data-theme="dark"] .form-success{color:var(--teal-300)}
+
+/* Login screen — centered card, no sidebar/navbar chrome. */
+.login-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:var(--bg)}
+.login-card{width:100%;max-width:380px;background:var(--panel);border:1px solid var(--line-glass);border-radius:var(--radius);box-shadow:var(--shadow-1);padding:32px}
+/* Centered logo above the wordmark+title — sits on the card's own --panel
+   surface (white/dark-slate in either theme), never on a teal background. */
+.login-card__logo-wrap{display:flex;justify-content:center;margin-bottom:12px}
+.login-card__logo{height:40px;width:auto;display:block}
+.login-card__brand{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.login-card__brand span{font-family:var(--font-display);font-weight:700;font-size:17px}
+.login-card h1{font-size:var(--step-1);margin-bottom:4px}
+.login-card p{color:var(--muted);font-size:13px;margin-bottom:20px}
+.login-card .btn-primary{width:100%;justify-content:center;display:flex;margin-top:6px}
+
+.loading-state{padding:40px;text-align:center;color:var(--muted)}
+
+/* Prompt 0192 — the content error boundary's fallback card
+   (ErrorBoundary.jsx). Existing tokens/classes only: the card itself is
+   the shared .card, buttons the shared .btn/.btn-primary. */
+.error-boundary__desc{color:var(--muted);margin:8px 0 0}
+.error-boundary__message{font-size:12px;color:var(--muted);margin:10px 0 0;word-break:break-word}
+.error-boundary__actions{display:flex;gap:10px;margin-top:16px}
+
+/* Analytics — plain HTML/CSS bars (RankedBarList.jsx, DailyTrendChart.jsx),
+   not SVG. Built entirely on existing tokens, no new ones. */
+.chart-card{margin-bottom:16px}
+.chart-card__head{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.chart-card__head .icon{width:18px;height:18px;color:var(--gold-600)}
+.chart-card__title{font-size:var(--step-0);font-weight:600;margin:0}
+.analytics-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media (max-width:820px){.analytics-grid{grid-template-columns:1fr}}
+
+.ranked-bar-row{display:grid;grid-template-columns:100px 1fr 40px;align-items:center;gap:10px;padding:7px 0;font-size:13px}
+/* Prompt 0235 — text-transform:capitalize removed: a source label is a campaign id compared character by character (ads_2026_10_a), it must render as is (closes the 0233 cosmetic note). */
+.ranked-bar-row__label{color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ranked-bar-row__track{height:8px;border-radius:999px;background:var(--glass);overflow:hidden}
+.ranked-bar-row__fill{display:block;height:100%;border-radius:999px;min-width:4px;transition:width var(--dur-fast) var(--ease-out)}
+.ranked-bar-row__fill--teal{background:var(--teal)}
+.ranked-bar-row__fill--gold{background:var(--gold)}
+.ranked-bar-row__value{text-align:right;font-weight:600;color:var(--muted)}
+
+.trend-chart{padding-top:4px}
+.trend-chart__bars{display:flex;align-items:flex-end;gap:3px;height:140px}
+.trend-chart__bar-wrap{flex:1;height:100%;display:flex;align-items:flex-end}
+.trend-chart__bar{width:100%;border-radius:3px 3px 0 0;transition:height var(--dur-fast) var(--ease-out)}
+.trend-chart__bar--gold{background:var(--gold)}
+.trend-chart__bar--teal{background:var(--teal)}
+.trend-chart__axis{display:flex;gap:3px;margin-top:8px}
+/* Prompt 0188 — a per-day box is narrower than its own "MM-DD" text on
+   the Dashboard's shared column (~19px box vs ~28px text at 10px font),
+   so overflow:hidden clipped labels to "08-0". Labels may now overflow
+   into their (always empty) neighbor boxes: the text lives in an inner
+   inline-block centered on its box via left:50% + translateX(-50%),
+   with the first/last labeled boxes edge-aligned instead so nothing
+   ever leaves the card. min-width:0 is load-bearing: with
+   overflow:visible a flex item's min-width:auto becomes min-content
+   (the text width), which would widen labeled boxes and misalign the
+   axis against the bars above it. Bar markup/positions unchanged. */
+.trend-chart__axis-label{flex:1;min-width:0;text-align:left;font-size:10px;color:var(--muted);white-space:nowrap;overflow:visible}
+.trend-chart__axis-text{display:inline-block;position:relative;left:50%;transform:translateX(-50%)}
+.trend-chart__axis-label--first .trend-chart__axis-text{left:0;transform:none}
+.trend-chart__axis-label--last .trend-chart__axis-text{left:100%;transform:translateX(-100%)}
+
+/* Versions — one form-card per platform (VersionsPage.jsx). Reuses
+   .card/.form-card/.form-grid/.field verbatim, just a 3-up grid wrapper. */
+.version-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;align-items:start}
+@media (max-width:980px){.version-grid{grid-template-columns:1fr}}
+
+/* Roles/permissions (RequireRole.jsx) + Admins table (AdminsPage.jsx) —
+   the select/button inside .data-table cells need no new classes, just
+   this fallback screen for a role that can't use the current route. */
+.access-denied{padding:60px 32px;text-align:center;color:var(--muted)}
+.access-denied h1{margin-bottom:8px;color:var(--ink)}
+/* Same custom-arrow treatment as .field select above (prompt 0132
+   Revision 5), extended here too for consistency across every admin
+   select — AdminsPage.jsx's role dropdown is the one <select> that lives
+   in a .data-table cell rather than a .field wrapper, so it needed its
+   own copy of the rule (different base padding/font-size already, a
+   separate pre-existing rule from .field select). Same reasoning on
+   appearance:none/native-behavior/theme-baked-SVG as that rule's own
+   comment — not repeated here.
+   DEAD-COPY WARNING (prompt 0132 Revision 6): same as .field select's own
+   warning above — '%23273f48'/'%23faf7f0' below are baked-in copies of
+   --ink's light/dark hex, not a live reference to it. If --ink changes,
+   update both this pair AND .field select's pair by hand, or the two
+   arrow styles will silently drift apart from each other and from --ink. */
+.data-table select{
+  font-family:var(--font-body);font-size:13px;padding:6px 30px 6px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);
+  appearance:none;-webkit-appearance:none;-moz-appearance:none;
+  background-repeat:no-repeat;background-position:right 10px center;background-size:12px 12px;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23273f48' stroke-opacity='0.65' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+}
+[data-theme="dark"] .data-table select{
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23faf7f0' stroke-opacity='0.62' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+}
+
+/* Prompt 0197 — the Background on/off switch in the Navbar
+   (BackgroundToggle.jsx). The outer <button> reuses .icon-btn for
+   height/border/spacing parity with ThemeToggle/logout; these rules only
+   shape the small track+knob inside it. ON (aria-checked=true, surface
+   'glass') slides the knob right and tints the track gold; OFF is the
+   neutral track. Transition kept short and disabled under
+   prefers-reduced-motion. */
+/* align-self:stretch — the surrounding .nav-actions row is
+   align-items:center, so stretching makes this button exactly as tall as
+   its .icon-btn neighbors (measured 41px) instead of hardcoding a height
+   that would drift if theirs ever changes. */
+.bg-toggle{display:inline-flex;align-items:center;align-self:stretch}
+.bg-toggle__track{
+  display:inline-flex;align-items:center;width:30px;height:16px;border-radius:var(--radius-pill);
+  background:var(--glass);border:1px solid var(--line);padding:1px;
+  transition:background var(--dur-fast),border-color var(--dur-fast);
+}
+.bg-toggle__knob{
+  width:12px;height:12px;border-radius:50%;background:var(--muted);
+  transform:translateX(0);transition:transform var(--dur-fast) var(--ease-out),background var(--dur-fast);
+}
+.bg-toggle[aria-checked="true"] .bg-toggle__track{background:rgba(45,212,191,0.25);border-color:var(--gold)}
+.bg-toggle[aria-checked="true"] .bg-toggle__knob{transform:translateX(14px);background:var(--gold)}
+@media (prefers-reduced-motion:reduce){.bg-toggle__knob,.bg-toggle__track{transition:none}}
+
+/* Glassmorphism — MUST stay the last thing in the whole stylesheet cascade
+   for these 7 selectors (.page-head added in the header-glass-card slice).
+   @supports adds no specificity of its own — a rule inside it is just a
+   normal rule, included or not based on the feature check, and for two
+   rules of identical specificity (all of these are single-class/attribute
+   selectors) the one declared LAST in the final loaded CSS wins, @supports
+   or not. This file (admin.css) loads after design.css (see
+   main.jsx/App.jsx), and .table-wrap/.login-card's own base rules live in
+   THIS file — so an earlier attempt at this block living in design.css was
+   silently losing to those two classes' own later/cross-file
+   `background:var(--panel)`, and to .stat-tile's own base rule further
+   down design.css itself. Putting it here, last, guarantees it wins for
+   all 7 regardless of which file/line their own base rule is declared on.
+   If you add another "glass panel" class, its own base rule must still be
+   declared somewhere ABOVE this block (anywhere in design.css or earlier
+   in this file) or the same bug comes back.
+   Browsers without backdrop-filter support simply never match this block,
+   so they keep each class's own solid `background:var(--panel)` (or, for
+   .topbar, `var(--bg)`) — that's the fallback, nothing extra needed for it. */
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  /* .topbar merged into this shared, theme-unscoped list in prompt 0131
+     Revision 2 — it used to be its own separate `[data-theme="dark"] .topbar`
+     rule below this one, reasoned at the time as "light mode's header has
+     no image behind it to blend with." Light mode gained its own body
+     background image in this same revision, so that reasoning no longer
+     holds, and .topbar now just follows the exact same pattern every other
+     glass element here already does: one unscoped rule, with EVERY
+     per-theme difference (fill via `--glass-panel-bg`, blur radius via
+     `--glass-blur` as of Revision 5) carried entirely by CSS custom
+     properties rather than by splitting this rule itself — no per-theme
+     rule needed, and specifically avoiding one: see this block's own
+     long comment above for why splitting into theme-scoped copies would
+     risk exactly the specificity/source-order bug that comment documents.
+     Still physically the LAST thing in the cascade, unchanged from before. */
+  .card,.stat-tile,.table-wrap,.login-card,.sidebar,.page-head,.topbar{
+    background:var(--glass-panel-bg);
+    backdrop-filter:blur(var(--glass-blur));
+    -webkit-backdrop-filter:blur(var(--glass-blur));
+  }
+}

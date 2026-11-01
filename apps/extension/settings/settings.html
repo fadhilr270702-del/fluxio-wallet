@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fluxio Wallet - Settings</title>
+  <link rel="stylesheet" href="../shared/theme.css">
+  <style>
+    /* Page-specific: this full-tab page's own centered-card shell. Every
+       reusable rule (buttons, inputs, .error/.desc/.loading, .warning,
+       .seed-grid/.seed-word, .settings-list/.settings-item*,
+       .toggle-switch*) comes from ../shared/theme.css — shared with the
+       popup's own in-popup Settings screen, see popup/popup.js. */
+    body {
+      min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 32px;
+    }
+    .card {
+      width: 440px; max-width: 100%; background: var(--flx-surface); border: 1px solid var(--flx-border);
+      border-radius: var(--flx-radius-lg); padding: 32px;
+    }
+  </style>
+</head>
+<body>
+  <div class="card" id="app">
+    <div class="loading">Loading…</div>
+  </div>
+  <script src="settings.js" type="module"></script>
+</body>
+</html>

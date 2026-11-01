@@ -1,0 +1,32 @@
+{
+  "name": "@fluxio/utils",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "description": "Small framework-agnostic helpers shared across Fluxio apps.",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./formatAddress": "./formatAddress.js",
+    "./formatNumber": "./formatNumber.js",
+    "./formatUnits": "./formatUnits.js",
+    "./solAmount": "./solAmount.js",
+    "./ethAmount": "./ethAmount.js",
+    "./validate": "./validate.js",
+    "./secureWipe": "./secureWipe.js",
+    "./abiDecode": "./abiDecode.js",
+    "./tokenValidation": "./tokenValidation.js",
+    "./relativeTime": "./relativeTime.js"
+  },
+  "devDependencies": {
+    "vitest": "3.2.4"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "bs58": "6.0.0"
+  }
+}

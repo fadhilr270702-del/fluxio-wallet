@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Fluxio Admin — internal panel for announcements and operations." />
+    <meta name="robots" content="noindex, nofollow" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <title>Fluxio Admin</title>
+    <script>
+      // Applied synchronously, before first paint, so a returning visitor's
+      // saved theme doesn't flash light-then-dark while React boots. Mirrors
+      // what useTheme.js persists to localStorage (separate key from the
+      // public site's, see hooks/useTheme.js).
+      try {
+        var t = localStorage.getItem('fluxio-admin-theme');
+        if (t) document.documentElement.setAttribute('data-theme', t);
+        // Prompt 0197 — same pre-paint treatment for the Background
+        // (glass/solid) switch, so a saved 'solid' choice doesn't flash
+        // the photo background for a frame on reload (see hooks/useSurface.js).
+        var s = localStorage.getItem('fluxio-admin-surface');
+        if (s) document.documentElement.setAttribute('data-surface', s);
+      } catch {}
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/app/main.jsx"></script>
+  </body>
+</html>

@@ -24,7 +24,7 @@ const BADGES = [
   { icon: 'lock', label: 'AES-256-GCM' },
   { icon: 'key', label: 'Real BIP-39' },
   { icon: 'puzzle', label: 'Manifest V3' },
-  { icon: 'shield', label: 'Built to be audited' }
+  { icon: 'github', label: 'Open source' }
 ];
 
 // Same whileInView fade+rise helper this session has used everywhere
@@ -105,7 +105,7 @@ export default function ClosingCta() {
       </motion.div>
 
       <motion.span className="eyebrow" {...reveal(reduceMotion, 0.18)}>
-        Built to be audited · Non custodial
+        Open source · Non custodial
       </motion.span>
 
       <h2

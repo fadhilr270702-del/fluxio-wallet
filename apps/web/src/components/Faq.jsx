@@ -16,7 +16,7 @@ const ITEMS = [
   },
   {
     q: 'Is the code open source?',
-    a: 'Not yet. The code is private while Fluxio is in active development. We plan to publish it after a first external review, and this answer will change when that happens.'
+    a: 'Yes. The source is published on GitHub under the MIT license, so anyone can read it, build it and compare it with what ships on the Chrome Web Store. Internal prompts, runbooks and notes are not part of the public repo.'
   },
   {
     q: 'Should I trust it with real funds today?',

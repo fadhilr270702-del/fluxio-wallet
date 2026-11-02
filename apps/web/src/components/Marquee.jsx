@@ -29,7 +29,7 @@ const ROW1_ITEMS = [
   { icon: 'lock', label: 'AES-256-GCM' },
   { icon: 'shield', label: 'PBKDF2' },
   { icon: 'puzzle', label: 'Manifest V3' },
-  { icon: 'shield', label: 'Built to be audited' }
+  { icon: 'github', label: 'Open source' }
 ];
 
 // Bottom row (moves right) — decorative "technologies & ecosystem" only,

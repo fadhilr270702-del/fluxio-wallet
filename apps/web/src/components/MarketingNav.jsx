@@ -116,11 +116,11 @@ export default function MarketingNav() {
             <span>Non custodial · Solana · Ethereum · BNB · Base</span>
             {/* Prompt 0165 added Telegram's masked-icon treatment here
                 (see MarketingFooter's identical usage / design.css's
-                .icon-mask); the plain-text GitHub link that used to sit
-                alongside it was removed by prompt 0216 because the repo
-                is private. The wrapper stays so justify-content:
-                space-between on the parent still only ever sees two
-                children. */}
+                .icon-mask); the plain-text GitHub link was removed by
+                prompt 0216 (repo private) and came back via prompt 0238
+                because the public repo shipped on 2 November 2026. The
+                wrapper keeps justify-content: space-between on the parent
+                seeing only two children. */}
             <div className="mkt-overlay__foot-links">
               <a
                 href="https://t.me/FluxioWallet_bot"
@@ -131,6 +131,9 @@ export default function MarketingNav() {
                 className="mkt-overlay__foot-icon"
               >
                 <span className="icon-mask" aria-hidden="true" />
+              </a>
+              <a href="https://github.com/fadhilr270702-del/fluxio-wallet" target="_blank" rel="noreferrer noopener" aria-label="GitHub" title="GitHub">
+                GitHub ↗
               </a>
             </div>
           </div>

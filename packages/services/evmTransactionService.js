@@ -36,6 +36,11 @@ import { isAddress } from 'ethers';
 import { fetchRpcWithFallback } from '@fluxio/crypto/rpc';
 import { NETWORKS, ACCOUNT_TYPES, getEvmTipFloorWei } from '@fluxio/constants';
 import { ethToWei } from '@fluxio/utils/ethAmount';
+// 0242 (catatan 18): Send memakai PEMOTONG plafon yang sama dengan swap
+// (pola g2 0227 Revisi 1) — impor satu arah evmTransactionService ->
+// evmSwapService, tanpa siklus (evmSwapService hanya mengimpor constants
+// dan rpc, dibuktikan di investigasi 0242 fase 1).
+import { pickSignedMaxFeePerGas } from './evmSwapService.js';
 
 /**
  * ERC-20 TRANSFERS (prompt 0113) — estimateErc20Transfer/sendErc20Transfer
@@ -137,7 +142,7 @@ export async function estimateEthTransfer({ network: networkKey, from, to, amoun
  *   `signer.signTransaction` directly (see scripts/evm-transfer-demo.mjs).
  * @returns {Promise<{ hash: string, explorerUrl: string|null }>}
  */
-export async function sendEthTransfer({ network: networkKey, from, to, amountEth, sign }) {
+export async function sendEthTransfer({ network: networkKey, from, to, amountEth, sign, displayedMaxFeeWei = null }) {
   if (typeof sign !== 'function') {
     throw new TransactionValidationError('MISSING_SIGNER', 'sendEthTransfer requires a `sign` function.');
   }
@@ -146,12 +151,23 @@ export async function sendEthTransfer({ network: networkKey, from, to, amountEth
   const toAddress = requireValidAddress(to, 'Recipient');
   const amountWei = requirePositiveWei(amountEth);
 
-  const [{ maxFeePerGas, maxPriorityFeePerGas }, nonce, balanceWei] = await Promise.all([
+  const [{ maxFeePerGas: freshMaxFeePerGas, maxPriorityFeePerGas: freshTip, baseFeePerGas }, nonce, balanceWei] = await Promise.all([
     estimateFeePerGas(network),
     getNonce(network, fromAddress),
     getEvmBalanceWei(network, fromAddress)
   ]);
   const gasLimit = NATIVE_TRANSFER_GAS_LIMIT;
+  // 0242 (catatan 18): plafon tampil ditegakkan sebelum tanda tangan —
+  // lihat applySendFeeCeiling. Cek saldo di bawah memakai angka TERSIGN.
+  const { signedMaxFeePerGas: maxFeePerGas, signedMaxPriorityFeePerGas: maxPriorityFeePerGas } = applySendFeeCeiling({
+    networkKey,
+    legLabel: 'native',
+    maxFeePerGas: freshMaxFeePerGas,
+    maxPriorityFeePerGas: freshTip,
+    baseFeePerGas,
+    gasLimit,
+    displayedMaxFeeWei
+  });
   const maxFeeWei = maxFeePerGas * gasLimit;
 
   if (balanceWei < amountWei + maxFeeWei) {
@@ -255,7 +271,7 @@ export async function estimateErc20Transfer({ network: networkKey, from, to, tok
  * @param {(transactionRequest: object) => Promise<string>} params.sign
  * @returns {Promise<{ hash: string, explorerUrl: string|null, amountRaw: bigint }>}
  */
-export async function sendErc20Transfer({ network: networkKey, from, to, tokenAddress, amountRaw, sign }) {
+export async function sendErc20Transfer({ network: networkKey, from, to, tokenAddress, amountRaw, sign, displayedMaxFeeWei = null }) {
   if (typeof sign !== 'function') {
     throw new TransactionValidationError('MISSING_SIGNER', 'sendErc20Transfer requires a `sign` function.');
   }
@@ -267,13 +283,23 @@ export async function sendErc20Transfer({ network: networkKey, from, to, tokenAd
 
   const data = encodeErc20TransferData(toAddress, amountRawValue);
 
-  const [{ maxFeePerGas, maxPriorityFeePerGas }, gasLimit, nonce, tokenBalanceRaw, nativeBalanceWei] = await Promise.all([
+  const [{ maxFeePerGas: freshMaxFeePerGas, maxPriorityFeePerGas: freshTip, baseFeePerGas }, gasLimit, nonce, tokenBalanceRaw, nativeBalanceWei] = await Promise.all([
     estimateFeePerGas(network),
     estimateGasForErc20Transfer(network, fromAddress, contractAddress, data),
     getNonce(network, fromAddress),
     fetchErc20BalanceOf(network, contractAddress, fromAddress),
     getEvmBalanceWei(network, fromAddress)
   ]);
+  // 0242 (catatan 18): pagar plafon yang sama dengan jalur native di atas.
+  const { signedMaxFeePerGas: maxFeePerGas, signedMaxPriorityFeePerGas: maxPriorityFeePerGas } = applySendFeeCeiling({
+    networkKey,
+    legLabel: 'token',
+    maxFeePerGas: freshMaxFeePerGas,
+    maxPriorityFeePerGas: freshTip,
+    baseFeePerGas,
+    gasLimit,
+    displayedMaxFeeWei
+  });
   const maxFeeWei = maxFeePerGas * gasLimit;
 
   if (tokenBalanceRaw < amountRawValue) {
@@ -501,7 +527,54 @@ async function estimateFeePerGas(network) {
   const maxPriorityFeePerGas = endpointTip < tipFloorWei ? tipFloorWei : endpointTip;
 
   const maxFeePerGas = baseFee * 2n + maxPriorityFeePerGas;
-  return { maxFeePerGas, maxPriorityFeePerGas };
+  // baseFeePerGas ikut pulang sejak 0242: pemotong plafon Send (pola g2)
+  // butuh lantai inklusi segar (baseFee + tip), sama seperti jalur swap.
+  return { maxFeePerGas, maxPriorityFeePerGas, baseFeePerGas: baseFee };
+}
+
+/**
+ * 0242 (catatan 18) — pagar plafon fee Send, pola g2 swap: angka "Max
+ * network fee" yang DITAMPILKAN layar Confirm adalah batas atas yang
+ * DITEGAKKAN, bukan sekadar perkiraan (pelajaran swap 10/13). Saat plafon
+ * diberikan, maxFeePerGas yang ditandatangani dipotong ke floor(plafon ÷
+ * gasLimit) lewat pickSignedMaxFeePerGas; potongan di bawah lantai inklusi
+ * segar menolak dengan SEND_FEE_ABOVE_DISPLAYED (teks mengarahkan Back
+ * karena angka tampil sudah basi). Parameter OPSIONAL di lapisan ini
+ * supaya pemanggil skrip Node (scripts/evm-transfer-demo.mjs) tetap jalan;
+ * jalur extension fail closed di handler SEND_TRANSFER background yang
+ * selalu memilikinya. Satu baris jejak "[fluxio send] execute ..." per
+ * tanda tangan, tanpa alamat dan tanpa jumlah (aturan diagnosis 0228).
+ */
+function applySendFeeCeiling({ networkKey, legLabel, maxFeePerGas, maxPriorityFeePerGas, baseFeePerGas, gasLimit, displayedMaxFeeWei }) {
+  if (displayedMaxFeeWei == null) {
+    return { signedMaxFeePerGas: maxFeePerGas, signedMaxPriorityFeePerGas: maxPriorityFeePerGas };
+  }
+  let ceilingWei;
+  try {
+    ceilingWei = BigInt(displayedMaxFeeWei);
+    if (ceilingWei <= 0n) throw new Error('non-positive');
+  } catch {
+    throw new TransactionValidationError('SEND_FEE_ABOVE_DISPLAYED', 'The network fee is now higher than shown. Go back and review the fee.');
+  }
+  const picked = pickSignedMaxFeePerGas({
+    freshMaxFeePerGas: maxFeePerGas,
+    baseFeePerGas,
+    maxPriorityFeePerGas,
+    gasLimit,
+    displayedMaxFeeWei: ceilingWei
+  });
+  if (picked == null) {
+    throw new TransactionValidationError('SEND_FEE_ABOVE_DISPLAYED', 'The network fee is now higher than shown. Go back and review the fee.');
+  }
+  try {
+    console.info('[fluxio send] execute ' + networkKey + ' ' + legLabel + ' ceiling ' + ceilingWei.toString());
+  } catch {
+    // Logging must never block the flow.
+  }
+  return {
+    signedMaxFeePerGas: picked,
+    signedMaxPriorityFeePerGas: maxPriorityFeePerGas < picked ? maxPriorityFeePerGas : picked
+  };
 }
 
 async function getNonce(network, address) {

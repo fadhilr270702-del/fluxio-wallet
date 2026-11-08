@@ -496,3 +496,90 @@ describe('EVM tip floor on the Send path (prompt 0231) — same rule as swap, fi
     expect(result.maxFeePerGas).toBe(EXPECTED_MAX_FEE_PER_GAS);
   });
 });
+
+// 0242 (catatan 18) — pagar plafon fee Send mengikuti pola g2 swap: plafon
+// dari angka tampil dipotongkan ke tanda tangan (pickSignedMaxFeePerGas),
+// potongan di bawah lantai inklusi menolak dengan SEND_FEE_ABOVE_DISPLAYED,
+// dan satu baris jejak "[fluxio send] execute ..." sebelum tanda tangan.
+// Fixture fee = fixture lama file ini (baseFee 1 gwei, tip 1,5 gwei ->
+// maxFee segar 3,5 gwei; lantai inklusi = baseFee + tip = 2,5 gwei).
+describe('Send fee ceiling (0242 — pola g2)', () => {
+  const SEND_MOCKS = {
+    eth_getTransactionCount: { body: { jsonrpc: '2.0', id: 1, result: '0x0' } },
+    eth_getBalance: { body: { jsonrpc: '2.0', id: 1, result: `0x${(10n ** 18n).toString(16)}` } },
+    eth_sendRawTransaction: { body: { jsonrpc: '2.0', id: 1, result: '0xCeilingHash1' } }
+  };
+
+  it('native: plafon tampil DI BAWAH fee segar memotong maxFeePerGas ke floor(plafon / 21000) — persis angka yang user lihat', async () => {
+    mockRpc({ [SEPOLIA.rpc.default]: { ...feeMocks(), ...SEND_MOCKS } });
+    const ceiling = (21000n * 3_000_000_000n).toString(); // 63e12 wei < 21000 x 3,5 gwei segar
+    const sign = vi.fn(async (transactionRequest) => {
+      expect(transactionRequest.maxFeePerGas).toBe(3_000_000_000n); // floor(63e12 / 21000), >= lantai inklusi 2,5 gwei
+      expect(transactionRequest.maxPriorityFeePerGas).toBe(PRIORITY_FEE); // tip < maxFee terpotong, tak perlu ikut turun
+      expect(transactionRequest.maxFeePerGas * transactionRequest.gasLimit <= BigInt(ceiling)).toBe(true);
+      return realSign(transactionRequest);
+    });
+    const result = await sendEthTransfer({ network: 'ethereum-sepolia', from: FROM, to: TO, amountEth: '0.01', sign, displayedMaxFeeWei: ceiling });
+    expect(sign).toHaveBeenCalledTimes(1);
+    expect(result.hash).toBe('0xCeilingHash1');
+  });
+
+  it('native: plafon DI ATAS fee segar lolos tanpa potong, dan baris jejak "[fluxio send] execute ... ceiling ..." tercetak sekali', async () => {
+    mockRpc({ [SEPOLIA.rpc.default]: { ...feeMocks(), ...SEND_MOCKS } });
+    const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
+    const ceiling = (21000n * 4_000_000_000n).toString(); // 84e12 > produk segar 73,5e12
+    const sign = vi.fn(async (transactionRequest) => {
+      expect(transactionRequest.maxFeePerGas).toBe(EXPECTED_MAX_FEE_PER_GAS); // segar, tak disentuh
+      return realSign(transactionRequest);
+    });
+    await sendEthTransfer({ network: 'ethereum-sepolia', from: FROM, to: TO, amountEth: '0.01', sign, displayedMaxFeeWei: ceiling });
+    const traceLines = infoSpy.mock.calls.map((c) => String(c[0])).filter((l) => l.startsWith('[fluxio send] execute'));
+    expect(traceLines).toEqual([`[fluxio send] execute ethereum-sepolia native ceiling ${ceiling}`]);
+  });
+
+  it('native: potongan di bawah lantai inklusi menolak SEND_FEE_ABOVE_DISPLAYED tanpa tanda tangan', async () => {
+    mockRpc({ [SEPOLIA.rpc.default]: { ...feeMocks(), ...SEND_MOCKS } });
+    const sign = vi.fn();
+    const ceiling = (21000n * 2_000_000_000n).toString(); // potongan 2 gwei < lantai inklusi 2,5 gwei
+    await expect(
+      sendEthTransfer({ network: 'ethereum-sepolia', from: FROM, to: TO, amountEth: '0.01', sign, displayedMaxFeeWei: ceiling })
+    ).rejects.toMatchObject({
+      code: 'SEND_FEE_ABOVE_DISPLAYED',
+      message: 'The network fee is now higher than shown. Go back and review the fee.'
+    });
+    expect(sign).not.toHaveBeenCalled();
+  });
+
+  it('ERC20: pemotong yang sama bekerja pada gasLimit hasil estimateGas x1,2 (bukan 21000)', async () => {
+    mockRpc({
+      [SEPOLIA.rpc.default]: {
+        ...feeMocks(),
+        ...SEND_MOCKS,
+        eth_estimateGas: GAS_ESTIMATE_RESULT, // 40000 -> gasLimit 48000
+        eth_call: tokenBalanceResult(1_000_000_000n)
+      }
+    });
+    const ceiling = (EXPECTED_GAS_LIMIT * 3_000_000_000n).toString(); // 48000 x 3 gwei
+    const sign = vi.fn(async (transactionRequest) => {
+      expect(transactionRequest.gasLimit).toBe(EXPECTED_GAS_LIMIT);
+      expect(transactionRequest.maxFeePerGas).toBe(3_000_000_000n); // floor(plafon / 48000)
+      return realSign(transactionRequest);
+    });
+    const result = await sendErc20Transfer({
+      network: 'ethereum-sepolia', from: FROM, to: TO, tokenAddress: TOKEN_CONTRACT, amountRaw: 500_000n, sign, displayedMaxFeeWei: ceiling
+    });
+    expect(sign).toHaveBeenCalledTimes(1);
+    expect(result.hash).toBe('0xCeilingHash1');
+  });
+
+  it('tanpa displayedMaxFeeWei (pemanggil skrip Node) perilaku lama utuh: fee segar, tanpa jejak send', async () => {
+    mockRpc({ [SEPOLIA.rpc.default]: { ...feeMocks(), ...SEND_MOCKS } });
+    const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
+    const sign = vi.fn(async (transactionRequest) => {
+      expect(transactionRequest.maxFeePerGas).toBe(EXPECTED_MAX_FEE_PER_GAS);
+      return realSign(transactionRequest);
+    });
+    await sendEthTransfer({ network: 'ethereum-sepolia', from: FROM, to: TO, amountEth: '0.01', sign });
+    expect(infoSpy.mock.calls.map((c) => String(c[0])).filter((l) => l.startsWith('[fluxio send]'))).toEqual([]);
+  });
+});

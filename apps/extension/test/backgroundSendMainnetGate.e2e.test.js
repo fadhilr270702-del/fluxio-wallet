@@ -203,12 +203,40 @@ describe('background.bundle.js — FLUXIO_INTERNAL_SEND_TRANSFER, mainnet gate l
     const result = await send(listeners, 'FLUXIO_INTERNAL_SEND_TRANSFER', {
       networkKey: 'base',
       to: EVM_RECIPIENT,
-      amount: '0.001'
+      amount: '0.001',
+      // 0242 (penyelarasan sadar): plafon tampil kini WAJIB untuk Send EVM
+      // (fail closed) — tes ini tetap menguji validasi saldo nyata, jadi
+      // plafonnya dibuat besar supaya alur sampai ke cek saldo.
+      displayedMaxFeeWei: '999000000000000000'
     });
 
     expect(result.error).toBeDefined();
     expect(result.error).not.toMatch(/mainnet sending not enabled yet/i);
     expect(result.error).toMatch(/insufficient balance/i);
+  }, E2E_TIMEOUT_MS);
+
+  it('(0242, catatan 18) Send EVM TANPA displayedMaxFeeWei ditolak fail closed — tidak ada broadcast, teks jujur', async () => {
+    const { listeners } = installFakeChromeForBackground();
+    await import(`${pathToFileURL(BUNDLE_PATH).href}?bust=${Math.random()}`);
+    const imported = await send(listeners, 'FLUXIO_INTERNAL_IMPORT_WALLET', { mnemonic: REFERENCE_MNEMONIC, password: 'a-password' });
+    expect(imported.error).toBeUndefined();
+    mockRpcByMethod({
+      eth_getBlockByNumber: { body: { jsonrpc: '2.0', id: 1, result: { baseFeePerGas: `0x${EVM_BASE_FEE.toString(16)}` } } },
+      eth_maxPriorityFeePerGas: { body: { jsonrpc: '2.0', id: 1, result: `0x${EVM_PRIORITY_FEE.toString(16)}` } },
+      eth_getTransactionCount: { body: { jsonrpc: '2.0', id: 1, result: '0x0' } },
+      eth_getBalance: { body: { jsonrpc: '2.0', id: 1, result: `0x${(10n ** 18n).toString(16)}` } },
+      eth_sendRawTransaction: { body: { jsonrpc: '2.0', id: 1, result: '0xMustNeverBroadcast' } }
+    });
+    const result = await send(listeners, 'FLUXIO_INTERNAL_SEND_TRANSFER', {
+      networkKey: 'base',
+      to: EVM_RECIPIENT,
+      amount: '0.001'
+    });
+    expect(result.error).toBeDefined();
+    expect(result.error).toMatch(/network fee is now higher than shown/i);
+    // Fail closed terjadi SEBELUM service dipanggil: error di atas sudah
+    // membuktikan tidak ada yang ditandatangani maupun di-broadcast
+    // (mock eth_sendRawTransaction sengaja disediakan dan tak tersentuh).
   }, E2E_TIMEOUT_MS);
 
   it('testnet (solana-devnet) still works end to end — a fully-mocked send still produces a real signature', async () => {

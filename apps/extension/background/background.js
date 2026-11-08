@@ -2338,6 +2338,13 @@ async function continueEvmTokenInApproveAfterReset(state) {
   if (state.displayedApproveMaxFeeWei == null) {
     return haltEvmStagedSwap(state, 'EVM_SWAP_FEE_ABOVE_DISPLAYED', { step: 'ceiling', detail: 'ceiling missing' });
   }
+  // 0241 fase 2 — jejak continuation, bentuk yang sama dengan kaki swap:
+  // sumber plafon + nilai, tanpa alamat dan tanpa jumlah pengguna.
+  try {
+    console.info('[fluxio swap] continuation ' + state.networkKey + ' approve ceiling ' + state.displayedApproveMaxFeeWei + ' from staged state');
+  } catch {
+    // Logging must never block the flow.
+  }
   const signedApproveMaxFeePerGas = evmSwapService.pickSignedMaxFeePerGas({
     freshMaxFeePerGas: maxFeePerGas,
     baseFeePerGas,
@@ -2678,6 +2685,16 @@ async function continueEvmTokenInSwapAfterApprove(state, approveReceipt = null) 
   // the display chain broke mid flight — never sign unbounded.
   if (state.displayedSwapMaxFeeWei == null) {
     return haltEvmStagedSwap(state, 'EVM_SWAP_FEE_ABOVE_DISPLAYED', { step: 'ceiling', detail: 'ceiling missing' });
+  }
+  // 0241 fase 2 — jejak continuation (aturan diagnosis 0228/0231): SATU
+  // baris per kaki lanjutan, sumber plafon dan nilainya, TANPA alamat dan
+  // tanpa jumlah pengguna. Satu-satunya sumber plafon lanjutan adalah
+  // state staged (disalin dari entry saat EXECUTE, dipersist di
+  // chrome.storage.session) — tidak pernah dihitung ulang.
+  try {
+    console.info('[fluxio swap] continuation ' + state.networkKey + ' swap ceiling ' + state.displayedSwapMaxFeeWei + ' from staged state');
+  } catch {
+    // Logging must never block the flow.
   }
   const signedMaxFeePerGas = evmSwapService.pickSignedMaxFeePerGas({
     freshMaxFeePerGas: maxFeePerGas,
@@ -3815,6 +3832,11 @@ const internalMessageHandlers = {
         return {
           symbol: network.nativeCurrency.symbol,
           isMaxFee: true, // EIP-1559: maxFeeWei is an upper bound, the actual charge is usually lower
+          // 0242 (catatan 18): plafon mentah dalam wei ikut ke popup — layar
+          // Confirm mengirimkannya balik di SEND_TRANSFER sebagai
+          // displayedMaxFeeWei dan pagar pola g2 menegakkannya (angka yang
+          // ditandatangani tidak pernah melebihi angka yang ditampilkan).
+          maxFeeWei: maxFeeWei.toString(),
           feeAmount: weiToEth(maxFeeWei),
           totalAmount: weiToEth(totalWei),
           balanceAmount: weiToEth(balanceWei),
@@ -3864,6 +3886,7 @@ const internalMessageHandlers = {
         sufficientToken: result.tokenBalanceRaw >= result.amountRaw,
         nativeSymbol: network.nativeCurrency.symbol,
         isMaxFee: true, // EIP-1559: maxFeeWei is an upper bound, same reasoning as the native EVM case above
+        maxFeeWei: result.maxFeeWei.toString(), // 0242: plafon untuk SEND_TRANSFER, lihat cabang native di atas
         feeAmount: weiToEth(result.maxFeeWei),
         needsAta: false,
         ataRentAmount: lamportsToSol(0n),
@@ -3915,7 +3938,7 @@ const internalMessageHandlers = {
    * gate: a genuine transfer with the owner's own mainnet funds still has
    * to happen and pass before Chrome Web Store submission.
    */
-  FLUXIO_INTERNAL_SEND_TRANSFER: async ({ networkKey, to, amount, tokenAddress = null }) => {
+  FLUXIO_INTERNAL_SEND_TRANSFER: async ({ networkKey, to, amount, tokenAddress = null, displayedMaxFeeWei = null }) => {
     if (!walletService.isUnlocked()) {
       throw new Error('Wallet is locked.');
     }
@@ -3958,13 +3981,21 @@ const internalMessageHandlers = {
       }
 
       if (network.accountType === ACCOUNT_TYPES.EVM) {
+        // 0242 (catatan 18, FAIL CLOSED): plafon tampil wajib ada sebelum
+        // tanda tangan — popup selalu mengirimnya dari respons ESTIMATE;
+        // absennya berarti layar Confirm yang basi, dan Back + estimasi
+        // ulang adalah jalan keluarnya (teks yang sama dengan pemotong).
+        if (displayedMaxFeeWei == null) {
+          throw new Error('The network fee is now higher than shown. Go back and review the fee.');
+        }
         const amountWei = ethToWei(amount);
         const { hash, explorerUrl } = await evmTransactionService.sendEthTransfer({
           network: networkKey,
           from,
           to,
           amountEth: amount,
-          sign: (transactionRequest) => walletService.signTransaction(networkKey, transactionRequest)
+          sign: (transactionRequest) => walletService.signTransaction(networkKey, transactionRequest),
+          displayedMaxFeeWei
         });
         try {
           await recordLocalTransaction({
@@ -4024,6 +4055,10 @@ const internalMessageHandlers = {
     }
 
     if (network.accountType === ACCOUNT_TYPES.EVM) {
+      // 0242 (catatan 18, FAIL CLOSED): sama dengan cabang native di atas.
+      if (displayedMaxFeeWei == null) {
+        throw new Error('The network fee is now higher than shown. Go back and review the fee.');
+      }
       const amountRaw = parseUnits(amount, known.decimals);
       const { hash, explorerUrl } = await evmTransactionService.sendErc20Transfer({
         network: networkKey,
@@ -4031,7 +4066,8 @@ const internalMessageHandlers = {
         to,
         tokenAddress,
         amountRaw,
-        sign: (transactionRequest) => walletService.signTransaction(networkKey, transactionRequest)
+        sign: (transactionRequest) => walletService.signTransaction(networkKey, transactionRequest),
+        displayedMaxFeeWei
       });
       try {
         await recordLocalTransaction({

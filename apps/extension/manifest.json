@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Fluxio Wallet",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "description": "Non custodial wallet for Solana and EVM chains. Your keys, your crypto. Swap on Solana and EVM chains. No added fee on transfers.",
   "permissions": ["storage", "windows", "alarms"],
   "host_permissions": [

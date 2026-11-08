@@ -291,6 +291,10 @@ const SWAP_PRIORITY_FEE_HEADROOM_LAMPORTS = SWAP_PRIORITY_FEE_CAP_LAMPORTS;
 // The last PREVIEW_SWAP_FEES response's real prioritization fee — feeds
 // the MAX formula above once a Review has been visited this session.
 let lastSwapPriorityFeeLamports = 0;
+// 0241 Opsi A — one counter per Review render: a PREVIEW response whose
+// epoch is no longer current belongs to an OLD render and writes nothing
+// (the 22 Oktober incident's on-screen number was a stale late write).
+let swapReviewRenderEpoch = 0;
 
 /**
  * MAX-button reserve (lamports) when "You pay" is native SOL. Prompt
@@ -2846,6 +2850,10 @@ async function renderSendForm(networkKey, wallet, asset, prefill = {}) {
         isToken,
         feeAmount: estimate.feeAmount,
         isMaxFee: estimate.isMaxFee,
+        // 0242 (catatan 18, EVM saja — undefined untuk Solana): plafon wei
+        // mentah dari estimasi, dikirim balik di SEND_TRANSFER supaya pagar
+        // background menegakkan persis angka yang layar ini tampilkan.
+        maxFeeWei: estimate.maxFeeWei,
         // Native-only:
         totalAmount: estimate.totalAmount,
         // Token-only:
@@ -2936,7 +2944,10 @@ function renderSendConfirm(networkKey, wallet, asset, details) {
         networkKey,
         to,
         amount,
-        tokenAddress: isToken ? asset.address : undefined
+        tokenAddress: isToken ? asset.address : undefined,
+        // 0242 (catatan 18): plafon tampil ikut ke background — EVM wajib
+        // (fail closed di handler), Solana tidak memilikinya (undefined).
+        displayedMaxFeeWei: details.maxFeeWei
       });
       renderSendResult(networkKey, wallet, result);
     } catch (error) {
@@ -3658,6 +3669,17 @@ function renderSwapReview(wallet, details) {
           ? `<div class="confirm-row"><span>Max network fee</span><span id="evmSwapFeeValue">…</span></div>`
           : `<div class="confirm-row"><span>Network fee (max)</span><span>${trimAmount(String((SWAP_BASE_FEE_LAMPORTS + SWAP_PRIORITY_FEE_CAP_LAMPORTS) / 1_000_000_000), 9)} SOL</span></div>`
       }
+      ${
+        // 0242 (catatan 23, keputusan pemilik Opsi 2: margin x2 TETAP,
+        // kosmetik saja): plafon token masuk memakai stand-in gas quote x2
+        // (simulasi mustahil sebelum approve mendarat), jadi angkanya kerap
+        // 2 sampai 3 kali fee nyata — satu kalimat kecil menjelaskannya,
+        // HANYA untuk token masuk (plafon native masuk dari estimateGas
+        // nyata sejak 0227 Revisi 1, tidak butuh keterangan ini).
+        isEvm && payAsset.address !== 'native'
+          ? `<p class="desc">This is an upper limit. The actual fee is usually much lower.</p>`
+          : ''
+      }
       <div id="rentRowSlot"></div>
       ${
         isEvm
@@ -3683,6 +3705,27 @@ function renderSwapReview(wallet, details) {
   const isEvmTokenToToken = isEvmTokenIn && receiveAsset.address !== 'native';
   if (isEvmTokenToToken) {
     note.textContent = 'Swapping a token to another token is coming soon.';
+  }
+  // 0241 Opsi A (akar insiden 22 Oktober, catatan 22): Confirm must never
+  // leave before THIS render's PREVIEW has written the fee ceilings onto
+  // the cached quote — the incident executed a quote whose preview had not
+  // landed, so the picker signed an unbounded fee (pre-P1) while the
+  // screen showed a STALE number written by an older render's late
+  // preview response. Two guards close both halves: (1) the Confirm
+  // button is held disabled until this render's preview succeeds, with a
+  // matching non-silent guard inside the click handler (the 0223 Revisi 2
+  // rule: no silent exit); (2) swapReviewRenderEpoch marks each render,
+  // and a preview response whose epoch is no longer current writes
+  // NOTHING — a late response from an old quote can never overwrite the
+  // new render's number or re-enable its button. The 0231 fail closed
+  // gate in the background stays as the safety net behind all of this.
+  swapReviewRenderEpoch += 1;
+  const renderEpoch = swapReviewRenderEpoch;
+  let evmPreviewReady = !isEvm;
+  let evmPreviewFailed = false;
+  if (isEvm && !isEvmTokenToToken) {
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = 'Estimating network fee…';
   }
 
   let quoteExpired = false;
@@ -3734,6 +3777,10 @@ function renderSwapReview(wallet, details) {
     if (isEvm) {
       try {
         const preview = await sendInternal('FLUXIO_INTERNAL_PREVIEW_SWAP_FEES', { quoteId: quote.quoteId });
+        // 0241 Opsi A: a response landing after a NEWER Review render
+        // belongs to an old quote — it writes nothing and enables nothing
+        // (the incident's displayed number was exactly such a stale write).
+        if (renderEpoch !== swapReviewRenderEpoch) return;
         const el = document.getElementById('evmSwapFeeValue');
         // Token-in (tahap C, owner K3): the preview's total already SUMS
         // the approve ceiling (live estimateGas x1,2) and the swap ceiling
@@ -3753,9 +3800,23 @@ function renderSwapReview(wallet, details) {
             twoTx.hidden = false;
           }
         }
+        // 0241 Opsi A: only now has THIS quote's ceiling reached the
+        // cached entry — Confirm may go (token to token stays blocked).
+        evmPreviewReady = true;
+        if (!isEvmTokenToToken) {
+          confirmBtn.disabled = false;
+          confirmBtn.textContent = 'Confirm Swap';
+        }
       } catch {
+        if (renderEpoch !== swapReviewRenderEpoch) return;
+        evmPreviewFailed = true;
         const el = document.getElementById('evmSwapFeeValue');
         if (el) el.textContent = 'unavailable';
+        // 0241 Opsi A: no ceiling ever reached the entry — Confirm stays
+        // held (executing now would only bounce off the 0231 fail closed
+        // gate, or worse on a pre-P1 build). Short, dash free sentence.
+        note.textContent = 'Fee estimate failed. Go back and try again.';
+        confirmBtn.textContent = 'Confirm Swap';
       }
       return;
     }
@@ -3798,6 +3859,14 @@ function renderSwapReview(wallet, details) {
     // archive). Only token to token stays blocked, and it SAYS so.
     if (isEvmTokenToToken) {
       note.textContent = 'Swapping a token to another token is coming soon.';
+      return;
+    }
+    // 0241 Opsi A: the handler mirror of the disabled button — a real DOM
+    // never fires a disabled button, but the guard must live HERE too (the
+    // 0223 lesson: the click path itself is what gets tested). Non silent:
+    // the note says exactly why nothing happened.
+    if (isEvm && !evmPreviewReady) {
+      note.textContent = evmPreviewFailed ? 'Fee estimate failed. Go back and try again.' : 'Estimating network fee…';
       return;
     }
     if (quoteExpired) {
@@ -4240,7 +4309,7 @@ function renderSwapFailed(wallet, details, error, { fundsMayHaveMoved = false, o
 // The real popup page never sets the flag, and nothing on a webpage can
 // reach this document's globalThis — in production this block is inert.
 if (globalThis.__FLUXIO_POPUP_TEST_HOOKS__) {
-  globalThis.__FLUXIO_POPUP_HOOKS__ = { renderSwapReview, renderSwapPayPicker, beginSwapExecution };
+  globalThis.__FLUXIO_POPUP_HOOKS__ = { renderSwapReview, renderSwapPayPicker, beginSwapExecution, renderSendConfirm };
 }
 
 main();

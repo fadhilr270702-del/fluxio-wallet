@@ -76,6 +76,17 @@ function el(id) {
 let sentMessages = [];
 let executeResponseOverride = null;
 let previewResponseOverride = null;
+// 0241 Opsi A harness extensions: hold a PREVIEW response in flight (the
+// race the 22 Oktober incident rode), release it later, or fail it — all
+// through the same stubbed sendMessage, no new mechanism.
+let holdPreviews = false;
+let heldPreviewResponders = [];
+let previewErrorOverride = null;
+function releaseHeldPreviews() {
+  const held = heldPreviewResponders;
+  heldPreviewResponders = [];
+  for (const respondNow of held) respondNow();
+}
 function installStubs() {
   elements.clear();
   // A FRESH array per install: a timed-out test body keeps running in the
@@ -86,6 +97,9 @@ function installStubs() {
   sentMessages = captured;
   executeResponseOverride = null;
   previewResponseOverride = null;
+  holdPreviews = false;
+  heldPreviewResponders = [];
+  previewErrorOverride = null;
   globalThis.document = {
     getElementById: (id) => el(id),
     addEventListener() {},
@@ -105,20 +119,32 @@ function installStubs() {
             return respond({ active: false });
           case 'FLUXIO_INTERNAL_GET_STATUS':
             return respond({ hasWallet: false });
-          case 'FLUXIO_INTERNAL_PREVIEW_SWAP_FEES':
-            if (previewResponseOverride) return respond(previewResponseOverride);
-            // The real token-in preview shape (tahap C): TWO ceilings, one
-            // combined total, approve needed (allowance 0 on chain today).
-            return respond({
-              kind: 'evm',
-              tokenIn: true,
-              approveNeeded: true,
-              nativeSymbol: 'BNB',
-              approveMaxFeeWei: '2880000000000',
-              swapMaxFeeWei: '20162300000000',
-              maxFeeWei: '23042300000000',
-              maxFeeFormatted: '0.0000230423'
-            });
+          case 'FLUXIO_INTERNAL_PREVIEW_SWAP_FEES': {
+            const previewReply = () => {
+              if (previewErrorOverride) return cb && cb({ error: previewErrorOverride });
+              if (previewResponseOverride) return respond(previewResponseOverride);
+              // The real token-in preview shape (tahap C): TWO ceilings, one
+              // combined total, approve needed (allowance 0 on chain today).
+              return respond({
+                kind: 'evm',
+                tokenIn: true,
+                approveNeeded: true,
+                nativeSymbol: 'BNB',
+                approveMaxFeeWei: '2880000000000',
+                swapMaxFeeWei: '20162300000000',
+                maxFeeWei: '23042300000000',
+                maxFeeFormatted: '0.0000230423'
+              });
+            };
+            if (holdPreviews) {
+              heldPreviewResponders.push(previewReply);
+              return;
+            }
+            return previewReply();
+          }
+          case 'FLUXIO_INTERNAL_SEND_TRANSFER':
+            // 0242: hentikan alur di sini — tes hanya memeriksa payload pesan.
+            return cb && cb({ error: 'STUB_STOP' });
           case 'FLUXIO_INTERNAL_EXECUTE_SWAP':
             if (executeResponseOverride) return respond(executeResponseOverride);
             return respond({
@@ -298,5 +324,133 @@ describe('popup.js — Confirm click on Ethereum + the reset note (0227)', () =>
     await flush();
     expect(el('twoTxNote').hidden).toBe(false);
     expect(el('twoTxNote').textContent).toBe('This swap sends three transactions: a reset, an approval and the swap.');
+  }, CLICK_TEST_TIMEOUT_MS);
+});
+
+// 0241 Opsi A — akar insiden 22 Oktober (catatan 22): Confirm tidak boleh
+// berangkat sebelum PREVIEW render ini menulis plafon ke entry, dan respons
+// preview dari render LAMA tidak boleh menimpa angka render baru. Ketiga
+// tes ini GAGAL pada kode pra-0241 (dibuktikan di arsip 0241) dan LULUS
+// sesudahnya.
+describe('popup.js — gating preview + penanda render (0241 Opsi A)', () => {
+  beforeEach(() => {
+    installStubs();
+  }, CLICK_TEST_TIMEOUT_MS);
+
+  it('(0241-1) klik Confirm saat PREVIEW masih in flight: TIDAK ada EXECUTE_SWAP, tombol tertahan "Estimating network fee…"', async () => {
+    const hooks = await importPopup();
+    holdPreviews = true;
+    hooks.renderSwapReview({}, tokenInDetails());
+    await flush(); // PREVIEW terkirim tapi DITAHAN — belum ada plafon di entry
+    expect(el('confirmSwapBtn').disabled).toBe(true);
+    expect(el('confirmSwapBtn').textContent).toBe('Estimating network fee…');
+    el('confirmSwapBtn').click(); // stub click mengabaikan disabled — persis kenapa handler butuh pagar sendiri
+    await flush();
+    expect(sentMessages.some((m) => m.type === 'FLUXIO_INTERNAL_EXECUTE_SWAP')).toBe(false);
+    // 0223 Revisi 2 rule: tidak ada jalur keluar diam — teks tampil.
+    expect(el('swapReviewNote').textContent).toBe('Estimating network fee…');
+    // Pelepasan preview SETELAH klik: tombol baru aktif sekarang.
+    releaseHeldPreviews();
+    await flush();
+    expect(el('confirmSwapBtn').disabled).toBe(false);
+    expect(el('confirmSwapBtn').textContent).toBe('Confirm Swap');
+  }, CLICK_TEST_TIMEOUT_MS);
+
+  it('(0241-2) PREVIEW gagal: fee "unavailable", klik Confirm TIDAK mengirim EXECUTE_SWAP, pesan "Fee estimate failed. Go back and try again."', async () => {
+    const hooks = await importPopup();
+    previewErrorOverride = 'RPC_DOWN: endpoint refused';
+    hooks.renderSwapReview({}, tokenInDetails());
+    await flush();
+    expect(el('evmSwapFeeValue').textContent).toBe('unavailable');
+    expect(el('confirmSwapBtn').disabled).toBe(true);
+    el('confirmSwapBtn').click();
+    await flush();
+    expect(sentMessages.some((m) => m.type === 'FLUXIO_INTERNAL_EXECUTE_SWAP')).toBe(false);
+    expect(el('swapReviewNote').textContent).toBe('Fee estimate failed. Go back and try again.');
+  }, CLICK_TEST_TIMEOUT_MS);
+
+  it('(0241-3) respons PREVIEW render LAMA tiba setelah render baru: angka render baru TIDAK tertimpa (penanda render)', async () => {
+    const hooks = await importPopup();
+    const a = tokenInDetails();
+    a.quote = { ...a.quote, quoteId: 'q-old' };
+    holdPreviews = true;
+    hooks.renderSwapReview({}, a);
+    await flush(); // preview quote lama DITAHAN in flight
+    // DOM nyata mengganti tombol lewat innerHTML saat re-render — artefak
+    // stub yang sama seperti tes INVESTIGASI 3: listener render lama dihapus.
+    el('confirmSwapBtn').listeners = {};
+    holdPreviews = false;
+    previewResponseOverride = {
+      kind: 'evm', tokenIn: true, approveNeeded: true, nativeSymbol: 'BNB',
+      approveMaxFeeWei: '2880000000000', swapMaxFeeWei: '20162300000000',
+      maxFeeWei: '23042300000000', maxFeeFormatted: '0.0000230423'
+    };
+    const b = tokenInDetails();
+    b.quote = { ...b.quote, quoteId: 'q-new' };
+    hooks.renderSwapReview({}, b);
+    await flush(); // preview render BARU selesai — angka benar tampil
+    expect(el('evmSwapFeeValue').textContent).toBe('0.0000230423 BNB');
+    // Baru sekarang respons lama tiba (angka SALAH untuk quote yang tampil).
+    previewResponseOverride = {
+      kind: 'evm', tokenIn: true, approveNeeded: true, nativeSymbol: 'BNB',
+      approveMaxFeeWei: '2880000000000', swapMaxFeeWei: '53196215931954',
+      maxFeeWei: '56076215931954', maxFeeFormatted: '0.000056076215931954'
+    };
+    releaseHeldPreviews();
+    await flush();
+    expect(el('evmSwapFeeValue').textContent).toBe('0.0000230423 BNB'); // tetap angka render baru
+    expect(el('confirmSwapBtn').disabled).toBe(false); // gating render baru tidak terganggu
+  }, CLICK_TEST_TIMEOUT_MS);
+
+});
+
+// 0242 — catatan 23 (kosmetik: keterangan batas atas pada token masuk saja)
+// dan catatan 18 (lesson 11: popup benar benar MENGIRIM plafon tampil di
+// SEND_TRANSFER — tanpa ini pagar background tidak pernah menerima angka).
+describe('popup.js — keterangan plafon token masuk (0242 catatan 23) + plafon Send ikut SEND_TRANSFER (0242 catatan 18)', () => {
+  beforeEach(() => {
+    installStubs();
+  }, CLICK_TEST_TIMEOUT_MS);
+
+  const UPPER_LIMIT_NOTE = 'This is an upper limit. The actual fee is usually much lower.';
+
+  it('(23) Review token masuk menampilkan keterangan batas atas di bawah Max network fee', async () => {
+    const hooks = await importPopup();
+    hooks.renderSwapReview({}, tokenInDetails());
+    await flush();
+    expect(el('app').innerHTML.includes(UPPER_LIMIT_NOTE)).toBe(true);
+  }, CLICK_TEST_TIMEOUT_MS);
+
+  it('(23) Review native masuk TIDAK menampilkan keterangan itu', async () => {
+    const hooks = await importPopup();
+    const details = tokenInDetails();
+    details.networkKey = 'ethereum';
+    details.payAsset = { type: 'native', address: 'native', symbol: 'ETH', decimals: 18, balance: '0.008' };
+    details.receiveAsset = { type: 'token', address: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', symbol: 'USDC', decimals: 6, balance: '0' };
+    previewResponseOverride = { kind: 'evm', nativeSymbol: 'ETH', maxFeeWei: '144116526550000', maxFeeFormatted: '0.00014411652655' };
+    hooks.renderSwapReview({}, details);
+    await flush();
+    expect(el('app').innerHTML.includes(UPPER_LIMIT_NOTE)).toBe(false);
+  }, CLICK_TEST_TIMEOUT_MS);
+
+  it('(18) klik Confirm & Send mengirim SEND_TRANSFER dengan displayedMaxFeeWei = maxFeeWei estimasi yang tampil', async () => {
+    const hooks = await importPopup();
+    expect(typeof hooks.renderSendConfirm).toBe('function'); // hook baru 0242
+    hooks.renderSendConfirm('ethereum', {}, { type: 'native', address: 'native', symbol: 'ETH', decimals: 18 }, {
+      to: '0x4B2c00fD7647780F1d21694Ce51feA235De7Ca39',
+      amount: '0.0005',
+      symbol: 'ETH',
+      isToken: false,
+      feeAmount: '0.000269237905716168',
+      isMaxFee: true,
+      totalAmount: '0.000769237905716168',
+      maxFeeWei: '269237905716168'
+    });
+    el('confirmBtn').click();
+    await flush();
+    const sends = sentMessages.filter((m) => m.type === 'FLUXIO_INTERNAL_SEND_TRANSFER');
+    expect(sends.length).toBe(1);
+    expect(sends[0].displayedMaxFeeWei).toBe('269237905716168');
+    expect(sends[0].networkKey).toBe('ethereum');
   }, CLICK_TEST_TIMEOUT_MS);
 });

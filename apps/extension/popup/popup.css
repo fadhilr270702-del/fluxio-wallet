@@ -436,7 +436,7 @@ button.account-card__label:hover {
   color: var(--flx-accent);
 }
 
-/* ---- Action row (Send / Receive / Buy / Swap — Refresh/Settings moved to
+/* ---- Action row (Send / Receive / Activity / Swap — Refresh/Settings moved to
    the account card header, alongside Lock; see .account-card__icon-btn) ---- */
 
 .action-row {
@@ -1157,8 +1157,8 @@ button.account-card__label:hover {
   gap: 8px;
 }
 
-/* ---- Toast (currently only Buy's "Coming soon" — Swap got its own real
-   flow in prompt 0115, see popup.js's showToast()) ---- */
+/* ---- Toast (brief self-dismissing notices: account switch/rename and
+   token add/remove — see popup.js's showToast()) ---- */
 
 .toast {
   position: fixed;

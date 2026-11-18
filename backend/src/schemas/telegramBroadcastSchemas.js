@@ -203,7 +203,9 @@ export const createBroadcastSchema = z
     // nonsensical combination" precedent as the scheduledAt+recurring
     // refine just above) — the controller/repo layer harmlessly ignores
     // both for a non-recurring create either way.
-    recurringIntervalHours: z.number().int().min(1).max(24).optional().default(1),
+    // Prompt 0246 — upper bound 24 → 168 (a weekly cadence), matching the
+    // column's own CHECK since migration 0028.
+    recurringIntervalHours: z.number().int().min(1).max(168).optional().default(1),
     // recurringStartsAt null/omitted = "Mulai sekarang" (due immediately —
     // see recurringSchedule.js's own computeRecurringDue()); set = "Mulai
     // pada jam tertentu". Same isoDateString shape as scheduledAt.
@@ -248,9 +250,18 @@ export const createBroadcastSchema = z
   .refine(titleLengthOk, TITLE_TOO_LONG_ISSUE)
   .refine(captionLengthOk, CAPTION_TOO_LONG_ISSUE);
 
-// Content-only edit (title/titleFormat/body/mediaUrl/mediaFileId/
-// mediaServerFilename/mediaType/buttons/bodyFormat) — never target/
-// schedule, see telegramBroadcastController.js's updateContent().
+// Content edit (title/titleFormat/body/mediaUrl/mediaFileId/
+// mediaServerFilename/mediaType/buttons/bodyFormat) — never target, and
+// never a one-time broadcast's scheduled_at (that is rescheduleSchema
+// below); see telegramBroadcastController.js's updateContent().
+//
+// Prompt 0246 — may also carry a new RECURRING schedule: intervalHours +
+// nextRunAt, both optional but only ever as a pair (the Edit page sends
+// them only when the admin actually changed the schedule, so a content
+// only save never touches it). nextRunAt becomes the new anchor; it must
+// be in the future, same rule as every other "when" in this file. Whether
+// the broadcast is recurring at all is cross-row state, checked in the
+// controller, not here.
 export const updateContentSchema = z
   .object({
     title: z.string().trim().min(1).max(1000),
@@ -264,7 +275,21 @@ export const updateContentSchema = z
     // submit) sends the exact same `fields.mediaType || null` shape.
     mediaType: z.enum(['image', 'video']).nullish(),
     buttons: z.array(broadcastButtonSchema).max(10, 'At most 10 buttons.').optional().default([]),
-    bodyFormat: formatField
+    bodyFormat: formatField,
+    intervalHours: z.number().int().min(1).max(168).nullish(),
+    nextRunAt: isoDateString.nullish()
+  })
+  .refine((data) => data.intervalHours == null || data.nextRunAt != null, {
+    message: 'nextRunAt is required when intervalHours is set.',
+    path: ['nextRunAt']
+  })
+  .refine((data) => data.nextRunAt == null || data.intervalHours != null, {
+    message: 'intervalHours is required when nextRunAt is set.',
+    path: ['intervalHours']
+  })
+  .refine((data) => data.nextRunAt == null || Date.parse(data.nextRunAt) > Date.now(), {
+    message: 'The next round must be in the future.',
+    path: ['nextRunAt']
   })
   .transform(sanitizeHtmlBodyIfNeeded)
   .transform(inferMediaTypeIfNeeded)

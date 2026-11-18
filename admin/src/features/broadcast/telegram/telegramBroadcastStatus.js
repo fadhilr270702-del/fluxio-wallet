@@ -64,6 +64,22 @@ function formatTimeShort(iso) {
 }
 
 /**
+ * Prompt 0246 — a time that may be days away (the interval now goes up to
+ * 168 hours and the next round can be chosen from the Edit page): the
+ * clock time alone when it falls on today's local date, otherwise the
+ * date first ("19 Nov 18:30"). No "-" character, same style note as
+ * everything here.
+ */
+function formatUpcomingTime(iso, now) {
+  const when = new Date(iso);
+  const today = new Date(now);
+  const sameLocalDay =
+    when.getFullYear() === today.getFullYear() && when.getMonth() === today.getMonth() && when.getDate() === today.getDate();
+  if (sameLocalDay) return formatTimeShort(iso);
+  return `${when.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })} ${formatTimeShort(iso)}`;
+}
+
+/**
  * Prompt 0166 — the most recent round's own delivered/failed counts, e.g.
  * "last round 3 of 3 delivered" or "last round 0 of 3 delivered" (a round
  * with subscribers but zero deliveries is exactly the incident this
@@ -102,7 +118,7 @@ function roundDurationPhrase(broadcast) {
   return `last round ${duration}, ${round.sentCount} of ${round.sentCount + round.failedCount}`;
 }
 
-export function recurringProgressLabel(broadcast) {
+export function recurringProgressLabel(broadcast, now = Date.now()) {
   if (!broadcast.isRecurring) return null;
   const count = broadcast.sentCount ?? 0;
   const interval = intervalPhrase(broadcast);
@@ -110,9 +126,10 @@ export function recurringProgressLabel(broadcast) {
   // fall back to the 0166 counts-only phrase for legacy rows.
   const roundResult = roundDurationPhrase(broadcast) ?? roundResultPhrase(broadcast);
   // Prompt 0234 (P4) — the next due slot, finally VISIBLE in History
-  // instead of only implied by the interval.
+  // instead of only implied by the interval. Prompt 0246 — with its date
+  // whenever that is not today.
   const nextRound = broadcast.status === 'recurring' && broadcast.recurringNextRoundAt
-    ? `next round ${formatTimeShort(broadcast.recurringNextRoundAt)}`
+    ? `next round ${formatUpcomingTime(broadcast.recurringNextRoundAt, now)}`
     : null;
 
   if (broadcast.status === 'recurring') {
@@ -120,8 +137,8 @@ export function recurringProgressLabel(broadcast) {
     // ("Mulai pada jam tertentu") — distinct from the generic "first send
     // in progress" wording below, which implies an imminent send rather
     // than a still-pending scheduled start.
-    if (!broadcast.recurringLastSentAt && broadcast.recurringStartsAt && Date.parse(broadcast.recurringStartsAt) > Date.now()) {
-      return `Not started yet — starts ${formatTimeShort(broadcast.recurringStartsAt)}, ${interval}`;
+    if (!broadcast.recurringLastSentAt && broadcast.recurringStartsAt && Date.parse(broadcast.recurringStartsAt) > now) {
+      return `Not started yet — starts ${formatUpcomingTime(broadcast.recurringStartsAt, now)}, ${interval}`;
     }
     const lastTime = broadcast.recurringLastSentAt ? formatTimeShort(broadcast.recurringLastSentAt) : null;
     const nextPart = nextRound ? `, ${nextRound}` : '';

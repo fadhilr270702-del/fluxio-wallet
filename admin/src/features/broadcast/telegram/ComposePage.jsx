@@ -14,7 +14,14 @@ import {
 } from '../../../services/telegramBroadcastApi.js';
 import { formatDate } from '../../../utils/formatDate.js';
 import ScheduleFields from './ScheduleFields.jsx';
+import RecurringScheduleFields from './RecurringScheduleFields.jsx';
 import { resolveScheduledAtIso } from './scheduleTimeHelpers.js';
+import {
+  recurringIntervalOptions,
+  initialScheduleEditState,
+  resolveRecurringScheduleEdit,
+  applyScheduleEditToPayload
+} from './recurringScheduleEdit.js';
 import RichTextEditor from './RichTextEditor.jsx';
 import RecentBroadcastCards from './RecentBroadcastCards.jsx';
 import ViewBroadcastModal from './ViewBroadcastModal.jsx';
@@ -153,10 +160,13 @@ export default function ComposePage() {
   const [loadError, setLoadError] = useState(null);
   const [existingScheduledAt, setExistingScheduledAt] = useState(null);
   const [existingIsRecurring, setExistingIsRecurring] = useState(false);
-  // Prompt 0164 — so the edit-mode hint text below can name the real
-  // interval instead of a hardcoded "every hour" (no longer accurate now
-  // that interval is per-broadcast).
-  const [existingRecurringIntervalHours, setExistingRecurringIntervalHours] = useState(1);
+  // Prompt 0246 — the recurring schedule is editable here now (it used to
+  // be a read-only "unchanged by this edit" hint). `scheduleOriginal` is
+  // what the two inputs held when the broadcast loaded, `scheduleEdit` what
+  // they hold now; the Save request carries the schedule only when the two
+  // differ — see recurringScheduleEdit.js.
+  const [scheduleOriginal, setScheduleOriginal] = useState({ intervalHours: '1', nextRoundLocal: '' });
+  const [scheduleEdit, setScheduleEdit] = useState({ intervalHours: '1', nextRoundLocal: '' });
 
   // Prompt 0132: create-mode-only additions. `editorKey` forces a fresh
   // RichTextEditor mount — it reads `initialContent` once at mount only
@@ -275,7 +285,9 @@ export default function ComposePage() {
         setInitialBodyHtml(bodyToEditorHtml(broadcast.body, broadcast.bodyFormat));
         setExistingScheduledAt(broadcast.scheduledAt);
         setExistingIsRecurring(broadcast.status === 'recurring');
-        setExistingRecurringIntervalHours(broadcast.recurringIntervalHours ?? 1);
+        const loadedSchedule = initialScheduleEditState(broadcast);
+        setScheduleOriginal(loadedSchedule);
+        setScheduleEdit(loadedSchedule);
         setExistingBotId(broadcast.bot); // prompt 0139 — this broadcast's OWN bot, not the switcher's current position
       })
       .catch(() => setLoadError('Could not load this broadcast.'))
@@ -550,7 +562,7 @@ export default function ComposePage() {
 
   function buildEditPayload() {
     const { buttons, title, body } = validateCommonFields();
-    return {
+    const payload = {
       title,
       titleFormat: 'html',
       body,
@@ -561,6 +573,13 @@ export default function ComposePage() {
       mediaType: fields.mediaType || null,
       buttons
     };
+    if (!existingIsRecurring) return payload;
+    // Prompt 0246 — one Save for content and schedule: the pair is added
+    // only when the admin changed it, so an untouched schedule section is
+    // the same content only request as before.
+    const resolved = resolveRecurringScheduleEdit({ original: scheduleOriginal, current: scheduleEdit });
+    if (resolved.error) throw new Error(resolved.error);
+    return applyScheduleEditToPayload(payload, resolved);
   }
 
   // Prompt 0139 — carries `bot: botId` so the backend creates this row
@@ -765,7 +784,7 @@ export default function ComposePage() {
           <p className="page-head__desc">
             {isEdit
               ? existingIsRecurring
-                ? 'Message content only — target is unchanged here. The next automatic round picks up this new content; the recurring schedule itself is unaffected.'
+                ? 'Message content and schedule. The target is unchanged here. The next automatic round picks up the new content.'
                 : 'Message content only — target and schedule are unchanged here. Use "Ubah waktu" in history to change the send time.'
               : 'One-way announcement to a Telegram channel or every subscriber who has started the bot. No reader tracking beyond delivery bookkeeping — never linked to any wallet identity.'}
           </p>
@@ -997,10 +1016,12 @@ export default function ComposePage() {
 
               {isEdit ? (
                 existingIsRecurring ? (
-                  <p className="field-hint">
-                    Recurring — sends every {existingRecurringIntervalHours} {existingRecurringIntervalHours === 1 ? 'hour' : 'hours'}, unchanged by
-                    this edit. Deactivate from its card or detail page.
-                  </p>
+                  <RecurringScheduleFields
+                    intervalHours={scheduleEdit.intervalHours}
+                    onIntervalHoursChange={(intervalHours) => setScheduleEdit((s) => ({ ...s, intervalHours }))}
+                    nextRoundLocal={scheduleEdit.nextRoundLocal}
+                    onNextRoundLocalChange={(nextRoundLocal) => setScheduleEdit((s) => ({ ...s, nextRoundLocal }))}
+                  />
                 ) : existingScheduledAt && (
                   <p className="field-hint">Scheduled for {formatDate(existingScheduledAt)} — unchanged by this edit.</p>
                 )
@@ -1072,7 +1093,7 @@ export default function ComposePage() {
                           value={fields.recurringIntervalHours}
                           onChange={(e) => update('recurringIntervalHours', Number(e.target.value))}
                         >
-                          {Array.from({ length: 24 }, (_, i) => i + 1).map((hours) => (
+                          {recurringIntervalOptions(fields.recurringIntervalHours).map((hours) => (
                             <option key={hours} value={hours}>
                               {hours} {hours === 1 ? 'hour' : 'hours'}
                             </option>

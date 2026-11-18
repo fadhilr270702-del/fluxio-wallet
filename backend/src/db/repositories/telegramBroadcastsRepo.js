@@ -104,7 +104,8 @@ const setTotalCountStmt = lazyStatement('UPDATE telegram_broadcasts SET total_co
 // broadcast's content is allowed (the next hourly round picks up the new
 // content), the same as it already was for 'scheduled'. Rescheduling
 // (updateScheduledAtIfScheduledStmt below) is NOT widened the same way —
-// "when" has no meaning for a recurring broadcast, only "what".
+// scheduled_at has no meaning for a recurring broadcast; its own "when"
+// (interval + anchor) is updateRecurringScheduleStmt, prompt 0246.
 const updateContentIfScheduledStmt = lazyStatement(`
   UPDATE telegram_broadcasts
   SET title = @title, title_format = @titleFormat, body = @body, media_url = @mediaUrl, media_file_id = @mediaFileId, media_server_filename = @mediaServerFilename, media_type = @mediaType, buttons = @buttons, body_format = @bodyFormat, updated_at = @now
@@ -113,6 +114,14 @@ const updateContentIfScheduledStmt = lazyStatement(`
 const updateScheduledAtIfScheduledStmt = lazyStatement(`
   UPDATE telegram_broadcasts SET scheduled_at = @scheduledAt, updated_at = @now
   WHERE id = @id AND status = 'scheduled'
+`);
+// Prompt 0246 — the recurring schedule itself (interval + anchor), editable
+// from the admin's Edit page. Same atomic "only if still in the expected
+// status" guard as everything above, but 'recurring' ONLY: a one-time
+// scheduled broadcast has no interval or anchor to change.
+const updateRecurringScheduleStmt = lazyStatement(`
+  UPDATE telegram_broadcasts SET recurring_interval_hours = @intervalHours, recurring_starts_at = @startsAt, updated_at = @now
+  WHERE id = @id AND status = 'recurring'
 `);
 // Prompt 0141 — persists a lazily-resolved per-bot file_id back onto the
 // broadcast row itself, once ensureBroadcastMediaFileId() (broadcastMedia.js)
@@ -326,6 +335,34 @@ export function updateScheduledContent(id, { title, titleFormat = 'plain', body,
     now: new Date().toISOString()
   });
   return result.changes > 0;
+}
+
+/**
+ * Prompt 0246 — content AND recurring schedule in ONE transaction, for the
+ * Edit page's single Save: `startsAt` (the admin's chosen next round)
+ * becomes the new anchor and `intervalHours` the new interval, so rounds
+ * fall on startsAt + k × interval from then on (see recurringSchedule.js's
+ * computeRecurringDue for how a round in progress and the rounds before
+ * the new anchor are treated). Returns false, changing NOTHING — not the
+ * content half either — if the row is no longer 'recurring' at the moment
+ * this runs (deactivated or replaced in between), same "lost the race"
+ * contract as updateScheduledContent.
+ */
+export function updateContentAndRecurringSchedule(id, content, { intervalHours, startsAt }) {
+  const db = getDb();
+  db.exec('BEGIN');
+  try {
+    const scheduleResult = updateRecurringScheduleStmt().run({ id, intervalHours, startsAt, now: new Date().toISOString() });
+    if (scheduleResult.changes === 0 || !updateScheduledContent(id, content)) {
+      db.exec('ROLLBACK');
+      return false;
+    }
+    db.exec('COMMIT');
+    return true;
+  } catch (err) {
+    db.exec('ROLLBACK');
+    throw err;
+  }
 }
 
 /** Same race-safe contract as updateScheduledContent, but only scheduled_at. */

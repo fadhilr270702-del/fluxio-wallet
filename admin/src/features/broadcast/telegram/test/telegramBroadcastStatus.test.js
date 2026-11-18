@@ -213,6 +213,46 @@ describe('recurringProgressLabel', () => {
     expect(label.includes('next round ')).toBe(true);
   });
 
+  // Prompt 0246 — the schedule can now be moved days ahead (interval up to
+  // 168 hours, next round chosen from the Edit page), so a bare clock time
+  // is no longer enough: the date is shown whenever the next round is not
+  // today. Local-calendar dates built with the Date constructor, so these
+  // hold in any time zone the suite runs in.
+  describe('next round shows the date when it is not today (0246)', () => {
+    const now = new Date(2026, 10, 16, 12, 0, 0).getTime();
+    const timeOf = (d) => d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+    const dateOf = (d) => d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+    const base = {
+      isRecurring: true,
+      status: 'recurring',
+      sentCount: 2,
+      recurringLastSentAt: new Date(2026, 10, 16, 6, 7, 0).toISOString(),
+      recurringIntervalHours: 72
+    };
+
+    it('later today: the time alone, exactly as before', () => {
+      const next = new Date(2026, 10, 16, 18, 30, 0);
+      const label = recurringProgressLabel({ ...base, recurringNextRoundAt: next.toISOString() }, now);
+      expect(label.endsWith(`every 72 hours, next round ${timeOf(next)}`)).toBe(true);
+    });
+
+    it('another day: the date, then the time', () => {
+      const next = new Date(2026, 10, 19, 18, 30, 0);
+      const label = recurringProgressLabel({ ...base, recurringNextRoundAt: next.toISOString() }, now);
+      expect(label.endsWith(`every 72 hours, next round ${dateOf(next)} ${timeOf(next)}`)).toBe(true);
+      expect(label.includes('-')).toBe(false);
+    });
+
+    it('a not yet started broadcast whose start is another day also names the date', () => {
+      const starts = new Date(2026, 10, 18, 9, 0, 0);
+      const label = recurringProgressLabel(
+        { isRecurring: true, status: 'recurring', sentCount: 0, recurringLastSentAt: null, recurringStartsAt: starts.toISOString(), recurringIntervalHours: 168 },
+        now
+      );
+      expect(label).toBe(`Not started yet — starts ${dateOf(starts)} ${timeOf(starts)}, every 168 hours`);
+    });
+  });
+
   it('shows the last round duration and counts from the rounds table (0234 P4)', () => {
     const label = recurringProgressLabel({
       isRecurring: true,

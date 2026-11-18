@@ -54,7 +54,7 @@ export const EMPTY_COMPOSE_FIELDS = {
   // (sendMode is a single select), but keeping them as distinct fields
   // avoids any risk of one silently reading stale state left over from the
   // other mode).
-  recurringIntervalHours: 1, // 1..24
+  recurringIntervalHours: 1, // 1..168 (prompt 0246)
   recurringStartChoice: 'now', // 'now' | 'at'
   recurringScheduleMode: 'today', // 'today' | 'later'
   recurringTodayTime: '',

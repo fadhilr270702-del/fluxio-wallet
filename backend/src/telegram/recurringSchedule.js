@@ -69,14 +69,41 @@ export function isRecurringDue(lastSentAtIso, intervalMs, now = Date.now()) {
  *     after that, never a burst of back-to-back sends for the slots that
  *     were missed.
  *
+ * Prompt 0246 — the anchor can now MOVE: the admin's Edit page re-anchors
+ * an active broadcast (anchor = the chosen next round, plus a new
+ * interval). Until then the anchor was never later than the first send, so
+ * case 3's floor arithmetic only ever saw a last send at or after the
+ * anchor. With a moved anchor it sees two new shapes, both measured
+ * against the pre-0246 code before this change:
+ *  a. The last send is OLDER than the anchor (the normal state right after
+ *     an edit). The floor goes negative and produced slots BEFORE the
+ *     anchor — a round 5.5 hours ahead of the chosen time in the measured
+ *     case. Now: the next slot is the anchor itself, never earlier.
+ *  b. The round that was in progress at edit time finishes AFTER the
+ *     anchor. Its finish time made the floor read "anchor slot already
+ *     served" and the chosen round was silently skipped. Now: a round
+ *     credits the anchor's grid only if it STARTED at or after the anchor
+ *     (`lastRoundStartedAtIso`, from telegram_recurring_rounds); one that
+ *     started before it leaves the anchor slot owed, so that round runs as
+ *     soon as the one in progress is done — owner decision, no slot is
+ *     skipped. It is owed exactly once: the round that then serves it
+ *     starts after the anchor, and plain arithmetic resumes.
+ *     Deliberately requires the last send to be strictly AFTER the anchor:
+ *     recordRecurringSend's legacy COALESCE backfill writes one and the
+ *     same timestamp into both columns for a NULL-anchor row whose round
+ *     necessarily started earlier, and that must stay plain arithmetic.
+ *     With no round start supplied (a channel target sends one message and
+ *     keeps no round row) nothing changes from the pre-0246 behavior.
+ *
  * Returns `{ due, anchorForThisRound }` — `anchorForThisRound` is the ISO
  * timestamp of the specific slot this due-check is evaluating (null when
  * there's no anchor to report: cases 1's null-startsAt branch, and case 2's
  * fallback). Not load-bearing for the worker's own control flow (only
- * `due` is), but useful for logging/debugging which slot a given round
- * actually corresponds to.
+ * `due` is), but it IS what the admin panel shows as "next round"
+ * (telegramBroadcastController.js's recurringNextRoundAt), so the worker
+ * and the label can never disagree.
  */
-export function computeRecurringDue(lastSentAtIso, startsAtIso, intervalMs, now = Date.now()) {
+export function computeRecurringDue(lastSentAtIso, startsAtIso, intervalMs, now = Date.now(), { lastRoundStartedAtIso = null } = {}) {
   if (!lastSentAtIso) {
     if (!startsAtIso) return { due: true, anchorForThisRound: null };
     const startsMs = Date.parse(startsAtIso);
@@ -89,7 +116,25 @@ export function computeRecurringDue(lastSentAtIso, startsAtIso, intervalMs, now 
 
   const startsMs = Date.parse(startsAtIso);
   const lastSentMs = Date.parse(lastSentAtIso);
-  const slotsCompleted = Math.floor((lastSentMs - startsMs) / intervalMs);
-  const nextSlotMs = startsMs + (slotsCompleted + 1) * intervalMs;
+  const anchorSlotStillOwed =
+    lastSentMs < startsMs ||
+    (lastSentMs > startsMs && lastRoundStartedAtIso != null && Date.parse(lastRoundStartedAtIso) < startsMs);
+  if (anchorSlotStillOwed) {
+    return { due: now >= startsMs, anchorForThisRound: startsAtIso };
+  }
+  const nextSlotMs = nextSlotMsAfter(lastSentMs, startsMs, intervalMs);
   return { due: now >= nextSlotMs, anchorForThisRound: new Date(nextSlotMs).toISOString() };
+}
+
+/**
+ * The first slot of the grid `anchorMs + k × intervalMs` (k = 0, 1, 2, …)
+ * that comes after the slot `timestampMs` sits in — or the anchor itself
+ * when the timestamp is before the anchor (prompt 0246: a grid has no
+ * slots before its own anchor). Shared by computeRecurringDue above and by
+ * worker.js's "open round with no cursor waits for the next slot" branch,
+ * so the two can never disagree about where slots are.
+ */
+export function nextSlotMsAfter(timestampMs, anchorMs, intervalMs) {
+  if (timestampMs < anchorMs) return anchorMs;
+  return anchorMs + (Math.floor((timestampMs - anchorMs) / intervalMs) + 1) * intervalMs;
 }

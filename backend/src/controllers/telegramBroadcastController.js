@@ -32,6 +32,7 @@ import {
   markChannelSendResult,
   transitionFromScheduled,
   updateScheduledContent,
+  updateContentAndRecurringSchedule,
   updateScheduledTime,
   findActiveRecurringBroadcast,
   transitionFromRecurring,
@@ -122,7 +123,12 @@ function toApiShape(row) {
 function recurringNextRoundAt(row) {
   if (row.status !== 'recurring') return null;
   const intervalMs = (row.recurring_interval_hours || 1) * 60 * 60 * 1000;
-  const { due, anchorForThisRound } = computeRecurringDue(row.recurring_last_sent_at, row.recurring_starts_at, intervalMs);
+  // Prompt 0246 — the same extra input the worker passes (the last finished
+  // round's own start), so a re-anchored schedule shows the round the
+  // worker will actually run next.
+  const { due, anchorForThisRound } = computeRecurringDue(row.recurring_last_sent_at, row.recurring_starts_at, intervalMs, Date.now(), {
+    lastRoundStartedAtIso: findLastFinishedRound(row.id)?.started_at ?? null
+  });
   // When already due, the "next round" is effectively now — report the slot
   // being served (or now for a no-anchor legacy row) rather than null.
   if (due) return anchorForThisRound ?? new Date().toISOString();
@@ -718,12 +724,40 @@ export function deactivateRecurring(req, res) {
  * 'recurring')` re-checks the row's *current* status atomically at the
  * moment this runs, so a broadcast the worker has already started sending
  * (or already deactivated) can never be silently rewritten.
+ *
+ * Prompt 0246 — the same request may also carry a new recurring SCHEDULE
+ * (intervalHours + nextRunAt, validated as a pair by updateContentSchema):
+ * the chosen next round becomes the new anchor. Content and schedule are
+ * written in one transaction, so neither can land without the other. A
+ * round in progress is not touched — it never reads interval or anchor —
+ * and the change applies from the next round (recurringSchedule.js). The
+ * schedule change gets its own audit action carrying the old and the new
+ * schedule, on top of the content edit's existing one.
  */
 export function updateContent(req, res) {
   const existing = requireExisting(req.params.id);
-  const { title, titleFormat, body, mediaUrl, mediaFileId, mediaServerFilename, mediaType, buttons, bodyFormat } = req.body;
+  const { title, titleFormat, body, mediaUrl, mediaFileId, mediaServerFilename, mediaType, buttons, bodyFormat, intervalHours, nextRunAt } = req.body;
   validateMediaServerFilename(mediaServerFilename);
-  const didUpdate = updateScheduledContent(existing.id, { title, titleFormat, body, mediaUrl, mediaFileId, mediaServerFilename, mediaType, buttons, bodyFormat });
+  const content = { title, titleFormat, body, mediaUrl, mediaFileId, mediaServerFilename, mediaType, buttons, bodyFormat };
+
+  const changesSchedule = intervalHours != null && nextRunAt != null;
+  let previousSchedule = null;
+  let newStartsAt = null;
+  if (changesSchedule) {
+    if (existing.status !== 'recurring') {
+      throw new HttpError(
+        409,
+        'NOT_RECURRING',
+        `The schedule can only be changed on an active recurring broadcast. This one is '${existing.status}'.`
+      );
+    }
+    previousSchedule = { intervalHours: existing.recurring_interval_hours, nextRoundAt: recurringNextRoundAt(existing) };
+    newStartsAt = new Date(nextRunAt).toISOString();
+  }
+
+  const didUpdate = changesSchedule
+    ? updateContentAndRecurringSchedule(existing.id, content, { intervalHours, startsAt: newStartsAt })
+    : updateScheduledContent(existing.id, content);
   if (!didUpdate) {
     const current = findBroadcastById(existing.id);
     throw new HttpError(
@@ -739,6 +773,20 @@ export function updateContent(req, res) {
     targetId: existing.id,
     metadata: { bot: existing.bot_id, title: stripToPlainText(title, titleFormat) }
   });
+  if (changesSchedule) {
+    recordAuditLog({
+      adminId: req.admin.id,
+      action: 'broadcast.telegram.recurring_reschedule',
+      targetType: 'telegram_broadcast',
+      targetId: existing.id,
+      metadata: {
+        bot: existing.bot_id,
+        title: stripToPlainText(title, titleFormat),
+        from: previousSchedule,
+        to: { intervalHours, nextRoundAt: newStartsAt }
+      }
+    });
+  }
   res.json({ broadcast: toApiShape(findBroadcastById(existing.id)) });
 }
 

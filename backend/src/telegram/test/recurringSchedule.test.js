@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isRecurringDue, computeRecurringDue } from '../recurringSchedule.js';
+import { isRecurringDue, computeRecurringDue, nextSlotMsAfter } from '../recurringSchedule.js';
 
 // Prompt 0134 Revision 1 — backend's first unit test, added specifically
 // because this real duplicate-send bug's root cause (a still-NULL
@@ -129,5 +129,99 @@ describe('computeRecurringDue', () => {
     expect(notDue.due).toBe(false);
     const due = computeRecurringDue(firstSend, startIso, TWENTY_FOUR_HOURS, START + TWENTY_FOUR_HOURS);
     expect(due).toEqual({ due: true, anchorForThisRound: new Date(START + TWENTY_FOUR_HOURS).toISOString() });
+  });
+});
+
+// Prompt 0246 — the schedule can now be re-anchored from the admin's Edit
+// page (anchor = the chosen next round, interval = the new interval). The
+// two hazards below are what the pre-0246 arithmetic did with a moved
+// anchor, measured in fase 1 against the real function; the vectors are
+// those same measured cases.
+describe('computeRecurringDue — re-anchored schedule (prompt 0246)', () => {
+  const HOUR = 60 * 60 * 1000;
+  const iso = (s) => new Date(Date.parse(s)).toISOString();
+
+  it('a round older than the anchor never fires a slot BEFORE the anchor: the next slot is the anchor itself', () => {
+    // Last round 12:00 WIB, owner picks next round 18:30 WIB, every 2 hours.
+    const lastSent = iso('2026-11-16T05:00:00.000Z');
+    const anchor = iso('2026-11-16T11:30:00.000Z');
+    const at1300 = Date.parse('2026-11-16T06:00:00.000Z');
+    expect(computeRecurringDue(lastSent, anchor, 2 * HOUR, at1300)).toEqual({ due: false, anchorForThisRound: anchor });
+    // One millisecond early is still not due; exactly at the anchor it is.
+    expect(computeRecurringDue(lastSent, anchor, 2 * HOUR, Date.parse(anchor) - 1).due).toBe(false);
+    expect(computeRecurringDue(lastSent, anchor, 2 * HOUR, Date.parse(anchor))).toEqual({ due: true, anchorForThisRound: anchor });
+  });
+
+  it('a round that STARTED before the anchor but finished after it does not consume the anchor slot: that round is still owed, immediately', () => {
+    // The round in progress at edit time ran past the chosen 18:30.
+    const anchor = iso('2026-11-16T11:30:00.000Z');
+    const lastSent = iso('2026-11-16T11:35:00.000Z');
+    const lastRoundStartedAtIso = iso('2026-11-16T11:20:00.000Z');
+    const now = Date.parse('2026-11-16T11:36:00.000Z');
+    expect(computeRecurringDue(lastSent, anchor, 24 * HOUR, now, { lastRoundStartedAtIso })).toEqual({
+      due: true,
+      anchorForThisRound: anchor
+    });
+  });
+
+  it('once a round that started at or after the anchor has landed, the cadence is anchor + k × interval — one round per slot, never two', () => {
+    const anchor = iso('2026-11-16T11:30:00.000Z');
+    const lastSent = iso('2026-11-16T11:50:00.000Z');
+    const lastRoundStartedAtIso = iso('2026-11-16T11:36:00.000Z');
+    const nextSlot = new Date(Date.parse(anchor) + 24 * HOUR).toISOString();
+    expect(computeRecurringDue(lastSent, anchor, 24 * HOUR, Date.parse('2026-11-16T11:51:00.000Z'), { lastRoundStartedAtIso })).toEqual({
+      due: false,
+      anchorForThisRound: nextSlot
+    });
+    expect(computeRecurringDue(lastSent, anchor, 24 * HOUR, Date.parse(nextSlot), { lastRoundStartedAtIso }).due).toBe(true);
+  });
+
+  it('legacy backfill is NOT mistaken for a re-anchor: last send exactly equal to the anchor keeps the plain arithmetic', () => {
+    // recordRecurringSend's COALESCE writes the SAME timestamp into both
+    // columns for a legacy NULL-anchor row; its round started earlier.
+    const anchor = iso('2026-11-16T11:30:00.000Z');
+    const lastRoundStartedAtIso = iso('2026-11-16T11:20:00.000Z');
+    const now = Date.parse('2026-11-16T11:31:00.000Z');
+    expect(computeRecurringDue(anchor, anchor, 6 * HOUR, now, { lastRoundStartedAtIso })).toEqual({
+      due: false,
+      anchorForThisRound: new Date(Date.parse(anchor) + 6 * HOUR).toISOString()
+    });
+  });
+
+  it('without a round start time (channel target, or a row that predates the rounds table) the result is the pre-0246 arithmetic', () => {
+    const anchor = iso('2026-11-16T11:30:00.000Z');
+    const lastSent = iso('2026-11-16T11:35:00.000Z');
+    const now = Date.parse('2026-11-16T11:36:00.000Z');
+    const expected = { due: false, anchorForThisRound: new Date(Date.parse(anchor) + 24 * HOUR).toISOString() };
+    expect(computeRecurringDue(lastSent, anchor, 24 * HOUR, now)).toEqual(expected);
+    expect(computeRecurringDue(lastSent, anchor, 24 * HOUR, now, { lastRoundStartedAtIso: null })).toEqual(expected);
+  });
+
+  it('a 168 hour interval is ordinary arithmetic', () => {
+    const anchor = iso('2026-11-16T11:30:00.000Z');
+    const lastSent = iso('2026-11-16T11:41:00.000Z');
+    const lastRoundStartedAtIso = iso('2026-11-16T11:30:01.000Z');
+    const weekLater = Date.parse(anchor) + 168 * HOUR;
+    expect(computeRecurringDue(lastSent, anchor, 168 * HOUR, weekLater - 1, { lastRoundStartedAtIso }).due).toBe(false);
+    expect(computeRecurringDue(lastSent, anchor, 168 * HOUR, weekLater, { lastRoundStartedAtIso })).toEqual({
+      due: true,
+      anchorForThisRound: new Date(weekLater).toISOString()
+    });
+  });
+});
+
+describe('nextSlotMsAfter (prompt 0246)', () => {
+  const HOUR = 60 * 60 * 1000;
+  const ANCHOR = Date.parse('2026-11-16T11:30:00.000Z');
+
+  it('a timestamp before the anchor maps to the anchor, however far before', () => {
+    expect(nextSlotMsAfter(ANCHOR - 1, ANCHOR, HOUR)).toBe(ANCHOR);
+    expect(nextSlotMsAfter(ANCHOR - 4 * HOUR - 123, ANCHOR, HOUR)).toBe(ANCHOR);
+  });
+
+  it('a timestamp at or after the anchor maps to the next slot strictly after the one it sits in', () => {
+    expect(nextSlotMsAfter(ANCHOR, ANCHOR, HOUR)).toBe(ANCHOR + HOUR);
+    expect(nextSlotMsAfter(ANCHOR + HOUR - 1, ANCHOR, HOUR)).toBe(ANCHOR + HOUR);
+    expect(nextSlotMsAfter(ANCHOR + 3 * HOUR + 5, ANCHOR, HOUR)).toBe(ANCHOR + 4 * HOUR);
   });
 });

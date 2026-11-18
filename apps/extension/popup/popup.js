@@ -131,12 +131,6 @@ const ICONS = {
   copy: '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"></rect><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"></path></svg>',
   check: '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg>',
   back: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"></polyline></svg>',
-  // Card + centered plus (Buy) — placeholder action, common "buy crypto"
-  // wallet glyph. The outer rect's bounding box is exactly centered on the
-  // 24x24 viewBox; the plus sits centered within the card's body (below
-  // the magstripe line), not the whole card, which reads better than
-  // dead-centering it against the stripe.
-  buy: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"></rect><line x1="2" y1="9" x2="22" y2="9"></line><line x1="12" y1="12" x2="12" y2="17"></line><line x1="9.5" y1="14.5" x2="14.5" y2="14.5"></line></svg>',
   // Two opposing arrows forming a cycle (Swap) — placeholder action, the
   // classic "repeat/exchange" glyph; rotationally symmetric by
   // construction, so no optical-centering correction needed.
@@ -146,12 +140,13 @@ const ICONS = {
   chevronDown: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"></polyline></svg>',
   pencil: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4 12.5-12.5z"></path></svg>',
   plus: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>',
-  // Clock face (Activity) — same viewBox/stroke-width/size as Refresh/
-  // Settings, its two header-row neighbors, so it reads at the same
-  // optical weight; a plain, unambiguous "history/time" glyph.
+  // Clock face (Activity) — a plain, unambiguous "history/time" glyph.
+  // Lives in the main action row since prompt 0245 (it was a header icon
+  // before that); same 20x20/1.8 metrics as its Send/Receive/Swap
+  // neighbors, so no size change was needed for the move.
   activity: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>',
   // Bell (Notifications, prompt 0170) — same viewBox/stroke-width/size as
-  // Refresh/Activity/Settings, its header-row neighbors.
+  // Refresh/Settings, its header-row neighbors.
   bell: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 01-3.46 0"></path></svg>'
 };
 
@@ -500,10 +495,10 @@ function wireCopyButton(button, text, { labelEl } = {}) {
 let toastHideTimer = null;
 
 /**
- * Brief, self-dismissing message (currently only Buy/Swap's "Coming
- * soon") — appended to `document.body`, not `#app`, specifically so a
- * screen navigation mid-fade (app.innerHTML getting reassigned) can't rip
- * the toast out from under its own fade-out transition.
+ * Brief, self-dismissing message (account switch/rename and token add/
+ * remove notices) — appended to `document.body`, not `#app`, specifically
+ * so a screen navigation mid-fade (app.innerHTML getting reassigned)
+ * can't rip the toast out from under its own fade-out transition.
  */
 function showToast(message) {
   let toastEl = document.getElementById('flxToast');
@@ -847,7 +842,6 @@ async function renderWalletReady(wallet) {
           </button>
           <div class="account-card__header-actions">
             <button class="account-card__icon-btn" id="actionRefresh" title="Refresh balances" aria-label="Refresh balances">${ICONS.refresh}</button>
-            <button class="account-card__icon-btn" id="actionActivity" title="Activity" aria-label="Activity">${ICONS.activity}</button>
             <button class="account-card__icon-btn" id="actionNotifications" title="Notifications" aria-label="Notifications">${ICONS.bell}${hasUnreadNotifications ? '<span class="notif-dot" aria-hidden="true"></span>' : ''}</button>
             <button class="account-card__icon-btn" id="actionSettings" title="Settings" aria-label="Settings">${ICONS.settings}</button>
             <button class="account-card__icon-btn" id="lockBtn" title="Lock wallet" aria-label="Lock wallet">${ICONS.lock}</button>
@@ -877,9 +871,9 @@ async function renderWalletReady(wallet) {
           <span class="action-btn__icon">${ICONS.receive}</span>
           <span class="action-btn__label">Receive</span>
         </button>
-        <button class="action-btn" id="actionBuy" title="Buy">
-          <span class="action-btn__icon">${ICONS.buy}</span>
-          <span class="action-btn__label">Buy</span>
+        <button class="action-btn" id="actionActivity" title="Activity">
+          <span class="action-btn__icon">${ICONS.activity}</span>
+          <span class="action-btn__label">Activity</span>
         </button>
         <button class="action-btn" id="actionSwap" title="Swap">
           <span class="action-btn__icon">${ICONS.swap}</span>
@@ -922,15 +916,15 @@ async function renderWalletReady(wallet) {
     renderNetworkPicker(wallet, sendableVisible);
   });
   document.getElementById('actionReceive').addEventListener('click', () => renderReceive(wallet));
-  // Buy is the one deliberate placeholder left — no on-ramp exists yet
-  // (Swap has been real since prompt 0200). A toast, not a disabled/inert
-  // button: a dead-looking control in the middle of an otherwise-live
-  // action row reads as broken, and a permanently-dimmed one makes the
-  // whole row look half-built.
-  document.getElementById('actionBuy').addEventListener('click', () => showToast('Coming soon'));
+  // Activity is the action row's third button since prompt 0245 — it
+  // replaced the Buy "Coming soon" placeholder (on-ramp deferred by owner
+  // decision: it needs a third-party partner whose approval and fee flow
+  // are not worth it at this stage), and the old header clock icon was
+  // removed with it (one entry point, not two; the freed header slot is
+  // reserved for Connect once TON Connect exists).
+  document.getElementById('actionActivity').addEventListener('click', () => renderActivityPicker(wallet, { onBack: () => renderWalletReady(wallet) }));
   document.getElementById('actionSwap').addEventListener('click', () => renderSwapNetworkPicker(wallet, visibleNetworks));
   document.getElementById('actionSettings').addEventListener('click', () => renderSettingsScreen(wallet));
-  document.getElementById('actionActivity').addEventListener('click', () => renderActivityPicker(wallet, { onBack: () => renderWalletReady(wallet) }));
   document.getElementById('actionNotifications').addEventListener('click', () => renderNotificationsScreen(wallet));
 
   const refreshBtn = document.getElementById('actionRefresh');
@@ -2244,21 +2238,18 @@ function wireTokenManageRemoveButtons(tokens, networkKey, rerender, back) {
 // @fluxio/services/historyService.js's own header comment for why) ----
 
 /**
- * Entry-point placement decision: a small icon in the account card's
- * header row, next to Refresh/Settings/Lock — NOT tucked into Settings
- * the way Manage Tokens was deliberately placed (see that feature's own
- * "+ Add token" removal comment, prompt 0110). The two decisions look
- * inconsistent side by side but rest on the same underlying principle
- * ("don't clutter the main screen with rarely-used actions") applied to
- * genuinely different frequencies of use: Manage Tokens is an occasional
- * configuration action (register a custom token once, rarely revisit),
- * while Activity — viewing your own transaction history — is core,
- * everyday wallet usage on par with Send/Receive/checking a balance, the
- * same way every reference wallet (Phantom, MetaMask) treats it as a
- * primary surface, not a Settings sub-item. A single icon among three
- * already-established header icons (Refresh/Settings/Lock) adds no new
- * visual language and no repeated per-row clutter the way the old "+ Add
- * token" links did — it's one icon, once, not N.
+ * Entry-point placement decision (revised in prompt 0245): Activity is
+ * the action row's third button — Send, Receive, Activity, Swap — where
+ * it replaced the Buy placeholder once the owner deferred the on-ramp,
+ * and the original header clock icon was removed with it (one entry
+ * point, not two; the freed header slot is reserved for Connect once TON
+ * Connect exists). The original reasoning versus Settings-gating still
+ * holds: Manage Tokens is an occasional configuration action (register a
+ * custom token once, rarely revisit), while Activity — viewing your own
+ * transaction history — is core, everyday wallet usage on par with
+ * Send/Receive/checking a balance, the same way every reference wallet
+ * (Phantom, MetaMask) treats it as a primary surface, not a Settings
+ * sub-item.
  */
 async function renderActivityPicker(wallet, { onBack } = {}) {
   const back = onBack || (() => renderWalletReady(wallet));
@@ -4309,7 +4300,7 @@ function renderSwapFailed(wallet, details, error, { fundsMayHaveMoved = false, o
 // The real popup page never sets the flag, and nothing on a webpage can
 // reach this document's globalThis — in production this block is inert.
 if (globalThis.__FLUXIO_POPUP_TEST_HOOKS__) {
-  globalThis.__FLUXIO_POPUP_HOOKS__ = { renderSwapReview, renderSwapPayPicker, beginSwapExecution, renderSendConfirm };
+  globalThis.__FLUXIO_POPUP_HOOKS__ = { renderSwapReview, renderSwapPayPicker, beginSwapExecution, renderSendConfirm, renderWalletReady };
 }
 
 main();

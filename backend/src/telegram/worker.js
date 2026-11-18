@@ -20,7 +20,7 @@
 import { config } from '../config/env.js';
 import { getTelegramClient, buildInlineKeyboard, TelegramApiError } from './client.js';
 import { buildBroadcastMessage, resolveBroadcastMedia, degradeForChannel } from './formatting.js';
-import { computeRecurringDue } from './recurringSchedule.js';
+import { computeRecurringDue, nextSlotMsAfter } from './recurringSchedule.js';
 import { classifySendError, computeRoundOutcome } from './recurringRoundOutcome.js';
 import { BOT_IDS } from './botIds.js';
 import { ensureBroadcastMediaFileId, needsMediaResolution } from './broadcastMedia.js';
@@ -47,6 +47,7 @@ import {
 import { listActiveSubscribers, deactivateSubscriber } from '../db/repositories/telegramSubscribersRepo.js';
 import {
   findOpenRound,
+  findLastFinishedRound,
   createRound,
   updateRoundProgress,
   finishRound,
@@ -550,14 +551,15 @@ export async function sendRecurringRound(broadcast) {
  * same one rule, no special-casing needed.
  *
  * Prompt 0164 — interval is now PER BROADCAST (recurring_interval_hours,
- * admin-chosen 1..24 at activation — was a single fixed global
+ * admin-chosen at activation and editable since prompt 0246, 1..168 since
+ * migration 0028 — was a single fixed global
  * RECURRING_INTERVAL_MS env value shared by every recurring broadcast).
  * `config.telegram.recurringIntervalMs` is kept only as a defensive
  * fallback for the — should be structurally unreachable — case of a row
  * whose own recurring_interval_hours is falsy despite the column's own
  * NOT NULL DEFAULT 1 constraint (e.g. a row inserted via raw SQL bypassing
  * the app layer entirely); every row read back through this repository
- * layer already always has a real 1..24 value, so in practice this
+ * layer already always has a real 1..168 value, so in practice this
  * fallback never actually triggers for a broadcast created through the
  * app. Kept rather than deleted purely as defense-in-depth, not because any
  * real row still needs it.
@@ -644,15 +646,25 @@ export async function processDueRecurring() {
       } else {
         const anchorMs = active.recurring_starts_at ? Date.parse(active.recurring_starts_at) : null;
         const roundStartMs = Date.parse(openRound.started_at);
-        const nextSlotMs =
-          anchorMs != null
-            ? anchorMs + (Math.floor((roundStartMs - anchorMs) / intervalMs) + 1) * intervalMs
-            : roundStartMs + intervalMs;
+        // Prompt 0246 — nextSlotMsAfter, not inline floor arithmetic: when
+        // the schedule was re-anchored after this attempt started, the
+        // round start is BEFORE the anchor and the next slot is the anchor
+        // itself (the inline version produced slots before it).
+        const nextSlotMs = anchorMs != null ? nextSlotMsAfter(roundStartMs, anchorMs, intervalMs) : roundStartMs + intervalMs;
         due = Date.now() >= nextSlotMs;
         if (due) resetRoundStart(openRound.id, new Date().toISOString());
       }
     } else {
-      ({ due } = computeRecurringDue(active.recurring_last_sent_at, active.recurring_starts_at, intervalMs));
+      // Prompt 0246 — the last finished round's own START time tells the
+      // due-check whether that round belongs to the current anchor's grid
+      // (see computeRecurringDue's own header: a round that began before a
+      // re-anchored schedule does not consume the anchor slot). Schedule
+      // edits need no other handling here: this reads the row fresh every
+      // tick, and a round in progress never reads interval or anchor at
+      // all, so it always finishes on the content and state it started with.
+      ({ due } = computeRecurringDue(active.recurring_last_sent_at, active.recurring_starts_at, intervalMs, Date.now(), {
+        lastRoundStartedAtIso: findLastFinishedRound(active.id)?.started_at ?? null
+      }));
     }
     if (!due) continue;
 

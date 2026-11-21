@@ -151,7 +151,7 @@ export default function Privacy() {
             <li>
               <strong>KyberSwap</strong> (<code>aggregator-api.kyberswap.com</code>), for swaps on
               Ethereum, BNB Chain and Base. A quote request carries only the two token contract addresses, the amount you
-              typed, and a static client label that identifies the Fluxio app itself. When you confirm
+              typed, and a static client label that identifies the Fluxio app itself. When you review or confirm
               a swap, the extension asks KyberSwap to build the transaction, and that build
               request includes your public wallet address as the sender and recipient of the swap.
               This mirrors how Solana swaps already work with Jupiter. KyberSwap never sees your seed

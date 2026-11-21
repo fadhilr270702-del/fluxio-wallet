@@ -325,6 +325,12 @@ export async function getEvmSwapQuote({ networkKey, tokenIn, tokenOut, amountInR
  * floor(gasEstimate × 1,2). Nothing here
  * broadcasts; the number is the same upper bound the Send screen's "Max
  * network fee" shows.
+ *
+ * Since prompt 0251 the extension's native-in PREVIEW no longer calls
+ * this (it reads the fee once itself and takes its gas from
+ * computeNativePreviewGas below, whose 'quote' branch is this exact
+ * floor(gas x 1,2) math). Kept exported for script callers and as the
+ * unit-tested reference of the 0213 formula.
  * @returns {Promise<{ gasLimit: bigint, maxFeePerGas: bigint, maxFeeWei: bigint }>}
  */
 export async function estimateEvmSwapFeeWei({ networkKey, gasEstimate }) {
@@ -346,6 +352,74 @@ export async function estimateEvmSwapFeeWei({ networkKey, gasEstimate }) {
   const { maxFeePerGas } = await getEvmFeePerGas({ networkKey });
   const gasLimit = (gas * 12n) / 10n;
   return { gasLimit, maxFeePerGas, maxFeeWei: gasLimit * maxFeePerGas };
+}
+
+/**
+ * Prompt 0251 (catatan 19, owner keputusan 1 sampai 3) — the two margins
+ * behind the native-in Review ceiling, as exact BigInt ratios plus the
+ * label the preview trace prints.
+ *  - 'estimate': a REAL eth_estimateGas over the real build calldata was
+ *    available — x1,3 over max(estimate, build gas).
+ *  - 'quote': the fallback when the build or the simulation failed —
+ *    x1,2 over the quote's own gas, exactly what every build up to 0.2.8
+ *    displayed (real money proven, so the fallback is no regression).
+ */
+export const EVM_SWAP_NATIVE_PREVIEW_MARGINS = Object.freeze({
+  estimate: Object.freeze({ numerator: 13n, denominator: 10n, label: '1.3' }),
+  quote: Object.freeze({ numerator: 12n, denominator: 10n, label: '1.2' })
+});
+
+/**
+ * Pure (prompt 0251): the gas limit behind the DISPLAYED native-in fee
+ * ceiling. Two rules, both from measured facts:
+ *
+ * 1. The basis MIRRORS what EXECUTE will sign. EXECUTE's gasLimit is
+ *    floor(max(estimateGas, build gas) x 1,2) — so the preview basis is
+ *    the same max(), never the estimate alone. On BNB Chain (baseFee 0,
+ *    so maxFeePerGas = tip = the inclusion floor) the cutter has NO fee
+ *    headroom: a ceiling built from a lower basis than the one EXECUTE
+ *    signs would bounce every Confirm (0221: the live estimate sat below
+ *    the build gas, and the signed gasLimit equalled the ceiling
+ *    exactly).
+ * 2. x1,3 over that basis leaves 8,33% (1,3 / 1,2) for the gas basis to
+ *    rise between Review and Confirm before a BNB Chain swap bounces.
+ *    Native-in is ONE transaction, so that bounce is soft and free —
+ *    which is why this is not the x2 the token-in swap leg needs (there
+ *    a halt burns the approve's gas). The largest route-gas move ever
+ *    measured between the displayed and the fresh quote is 6,3% (0220).
+ *
+ * Why not the quote gas (the pre-0251 basis): Kyber's quote gas undershot
+ * the real eth_estimateGas by 21,9% on Base (0227: 330.498 vs 402.727),
+ * so the displayed ceiling sat at 396.597 gas against a real gasUsed of
+ * 392.554 and the cutter had to cut on the very first real Base swap.
+ *
+ * Falls back to the quote branch when EITHER the estimate or the build
+ * gas is missing. Throws only when nothing usable is left.
+ * @returns {{ source: 'estimate'|'quote', basisGas: bigint, gasLimit: bigint, marginLabel: string }}
+ */
+export function computeNativePreviewGas({ estimatedGas = null, buildGas = null, quoteGas }) {
+  const toPositive = (value) => {
+    if (value == null) return null;
+    try {
+      const n = BigInt(value);
+      return n > 0n ? n : null;
+    } catch {
+      return null;
+    }
+  };
+  const estimate = toPositive(estimatedGas);
+  const build = toPositive(buildGas);
+  if (estimate != null && build != null) {
+    const basisGas = estimate > build ? estimate : build;
+    const margin = EVM_SWAP_NATIVE_PREVIEW_MARGINS.estimate;
+    return { source: 'estimate', basisGas, gasLimit: (basisGas * margin.numerator) / margin.denominator, marginLabel: margin.label };
+  }
+  const quote = toPositive(quoteGas);
+  if (quote == null) {
+    throw new EvmSwapValidationError('INVALID_AMOUNT', 'No usable gas figure for the fee preview.');
+  }
+  const margin = EVM_SWAP_NATIVE_PREVIEW_MARGINS.quote;
+  return { source: 'quote', basisGas: quote, gasLimit: (quote * margin.numerator) / margin.denominator, marginLabel: margin.label };
 }
 
 /**
@@ -406,8 +480,11 @@ export async function getEvmFeePerGas({ networkKey }) {
  * EVM_SWAP_FEE_ABOVE_DISPLAYED. The cut value must still be able to land
  * in a block: below the fresh inclusion floor (baseFee + tip) the picker
  * returns null and the caller refuses exactly as before (the gas-truly-
- * rose case). A null/absent ceiling (PREVIEW never answered) keeps the
- * fresh fee — nothing was displayed to guarantee.
+ * rose case). A null/absent ceiling keeps the fresh fee AT THIS LAYER
+ * only (script callers that never displayed anything); the extension
+ * never reaches that branch — background.js refuses to sign any EVM swap
+ * leg without a stored displayed ceiling (token-in since 0231 Revisi 2,
+ * native-in since 0251).
  * @returns {bigint|null} the maxFeePerGas to sign, or null to refuse.
  */
 export function pickSignedMaxFeePerGas({ freshMaxFeePerGas, baseFeePerGas, maxPriorityFeePerGas, gasLimit, displayedMaxFeeWei }) {

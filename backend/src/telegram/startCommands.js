@@ -7,6 +7,17 @@
  */
 
 /**
+ * Prompt 0250 (catatan 24) — the bot serves PRIVATE chats only, and this
+ * is the one definition of "private" the poller's earliest guard and
+ * isUnknownPrivateMessage() below both read. Fail closed: only the exact
+ * string 'private' qualifies — 'group', 'supergroup', 'channel', any
+ * future chat type and a missing chat.type are all "not private".
+ */
+export function isPrivateChatMessage(message) {
+  return message?.chat?.type === 'private';
+}
+
+/**
  * The exact owner-specified shape for a /start message that may carry a
  * deep-link payload: "/start", optionally "@BotUsername" (Telegram appends
  * it in group contexts), optionally one payload of 1 to 64 characters from
@@ -63,7 +74,9 @@ export const AUTO_REPLY_WINDOW_MS = 10 * 60 * 1000;
  * these with AUTO_REPLY_TEXT. Deliberately conservative on every gate:
  *  - chat.type must be 'private' (the poller also receives group messages,
  *    subject to the bot's privacy mode — an auto reply must never land in
- *    a group/channel);
+ *    a group/channel; since prompt 0250 the poller already skips every non
+ *    private message before any branch, this gate is kept as a second
+ *    belt so this function stays correct on its own);
  *  - from must exist and not be a bot;
  *  - anything the welcome branch's own trigger shape catches
  *    (text startsWith '/start' — mirrored exactly, so classification can
@@ -73,7 +86,7 @@ export const AUTO_REPLY_WINDOW_MS = 10 * 60 * 1000;
  */
 export function isUnknownPrivateMessage(update) {
   const message = update?.message;
-  if (!message || message.chat?.type !== 'private') return false;
+  if (!message || !isPrivateChatMessage(message)) return false;
   if (!message.from || message.from.is_bot) return false;
   const text = message.text;
   if (typeof text === 'string' && text.startsWith('/start')) return false;

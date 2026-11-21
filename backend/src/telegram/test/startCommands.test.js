@@ -6,7 +6,14 @@
  * require the archived fixture.
  */
 import { describe, it, expect } from 'vitest';
-import { parseStartPayload, isHelpCommand, HELP_MESSAGE_TEXT, isUnknownPrivateMessage, AUTO_REPLY_TEXT } from '../startCommands.js';
+import {
+  parseStartPayload,
+  isHelpCommand,
+  HELP_MESSAGE_TEXT,
+  isUnknownPrivateMessage,
+  AUTO_REPLY_TEXT,
+  isPrivateChatMessage
+} from '../startCommands.js';
 
 describe('parseStartPayload', () => {
   it('extracts a valid deep-link payload', () => {
@@ -68,6 +75,23 @@ describe('HELP_MESSAGE_TEXT', () => {
     expect(HELP_MESSAGE_TEXT.includes('-')).toBe(false);
   });
 });
+// Prompt 0250 — satu definisi "private" untuk guard paling awal poller.
+describe('isPrivateChatMessage', () => {
+  it('true hanya untuk chat.type persis private', () => {
+    expect(isPrivateChatMessage({ chat: { id: 1, type: 'private' } })).toBe(true);
+  });
+
+  it('gagal tertutup: group, supergroup, channel, jenis tak dikenal, chat.type hilang, chat hilang, message hilang', () => {
+    for (const type of ['group', 'supergroup', 'channel', 'Private', 'sesuatu_baru', '', null, undefined]) {
+      expect(isPrivateChatMessage({ chat: { id: -1, type } })).toBe(false);
+    }
+    expect(isPrivateChatMessage({ chat: { id: -1 } })).toBe(false);
+    expect(isPrivateChatMessage({})).toBe(false);
+    expect(isPrivateChatMessage(undefined)).toBe(false);
+    expect(isPrivateChatMessage(null)).toBe(false);
+  });
+});
+
 // Prompt 0236 — klasifikasi pesan pribadi yang TIDAK dijawab /start maupun /help.
 describe('isUnknownPrivateMessage', () => {
   const msg = (over = {}, chatOver = {}, fromOver = {}) => ({

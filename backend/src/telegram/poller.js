@@ -18,6 +18,7 @@ import { upsertFromStart, recordWelcomeSent, findSubscriberByChatId } from '../d
 import { getOffset, setOffset } from '../db/repositories/telegramPollStateRepo.js';
 import { sendWelcomeMessage, shouldSendWelcome } from './welcome.js';
 import {
+  isPrivateChatMessage,
   parseStartPayload,
   isHelpCommand,
   HELP_MESSAGE_TEXT,
@@ -104,6 +105,21 @@ export async function pollOnce(botId, fetchUpdatesFn) {
   for (const update of updates) {
     maxUpdateId = Math.max(maxUpdateId, update.update_id);
     const message = update.message;
+    // Prompt 0250 (catatan 24) — the bot serves PRIVATE chats only, decided
+    // here, once, before any branch below can run. A message from a group,
+    // a supergroup or anything else that is not exactly chat.type 'private'
+    // is skipped in TOTAL SILENCE (owner decision, Opsi A): no welcome, no
+    // /help reply, no auto reply, and above all no upsertFromStart — a
+    // group chat id must never become a subscriber row, or every
+    // subscriber broadcast would be posted into that group and the
+    // subscriber metrics would count it. Proven real before this guard:
+    // a plain "/start" typed in a group DOES reach the bot under the
+    // default privacy mode (owner capture, 20 November 2026 — the two
+    // fixtures in prompt/evidence/0250-group-start/). maxUpdateId above
+    // already includes this update, so the offset still advances and a
+    // skipped message is never fetched again. Deliberately no log line: a
+    // third party could otherwise fill the log from any group.
+    if (message && !isPrivateChatMessage(message)) continue;
     if (message?.text?.startsWith('/start')) {
       const chatId = String(message.chat.id);
       // Prompt 0233 — the /start deep-link payload ("start parameter"),

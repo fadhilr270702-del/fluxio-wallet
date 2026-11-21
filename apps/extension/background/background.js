@@ -1612,10 +1612,19 @@ async function tryResolveRealReceivedEvm(networkKey, entry) {
  * failed estimate must never block the preview.
  * @returns {Promise<bigint>}
  */
-async function previewEvmSwapL1FeeWei(entry, evmAddr, { gasLimit, maxFeePerGas, valueRaw }) {
+async function previewEvmSwapL1FeeWei(entry, evmAddr, { gasLimit, maxFeePerGas, valueRaw, build: providedBuild }) {
   if (!evmSwapService.EVM_L1_FEE_ORACLE_BY_NETWORK[entry.networkKey]) return 0n;
+  // 0251: the native-in PREVIEW already holds the build it simulated —
+  // it passes it here so ONE Kyber build serves both the gas estimate and
+  // the L1 fee. An explicit null means "that build failed": no second
+  // attempt, the ceiling is simply shown without the L1 share (same
+  // degradation as before). Token-in passes nothing and builds here.
+  if (providedBuild === null) {
+    console.log('[fluxio] l1 fee preview unavailable (build) — ceiling shown without it');
+    return 0n;
+  }
   try {
-    const build = await evmSwapService.buildEvmSwapTransaction({
+    const build = providedBuild ?? await evmSwapService.buildEvmSwapTransaction({
       networkKey: entry.networkKey,
       routeSummary: entry.routeSummary,
       sender: evmAddr,
@@ -1904,11 +1913,13 @@ async function executeEvmSwap({ quoteId, networkKey }) {
   // could no longer land in a block (below fresh baseFee + tip — gas that
   // TRULY rose) does the old refusal fire, re-caching the fresh quote
   // under EVM_SWAP_FEE_ABOVE_DISPLAYED so the popup names the FEE.
-  // No stored ceiling on NATIVE-in (PREVIEW never answered) keeps the
-  // fresh fee. Token-in FAILS CLOSED instead (0231 Revisi 2, owner P1):
-  // the popup always previews a token-in Review, so a missing ceiling
-  // here means the display chain broke — the 22 Oktober incident signed
-  // 5,64x the number the owner saw through exactly this hole. Never sign
+  // A missing stored ceiling FAILS CLOSED in BOTH directions: token-in
+  // since 0231 Revisi 2 (owner P1 — the 22 Oktober incident signed 5,64x
+  // the number the owner saw through exactly this hole), native-in since
+  // 0251 (owner keputusan 5 — until then native-in kept the fresh fee
+  // and the popup's 0241 Confirm gating was the only fence). The popup
+  // always previews a Review, so a missing ceiling here means the display
+  // chain broke or EXECUTE was called without a Review. Never sign
   // unbounded; bounce back to Review (the re-render re-previews).
   // Token-in's displayed swap ceiling lives on displayedSwapMaxFeeWei
   // (two-legged PREVIEW, tahap C); native-in keeps displayedMaxFeeWei.
@@ -1917,14 +1928,21 @@ async function executeEvmSwap({ quoteId, networkKey }) {
   // token masuk yang melewati approve): satu baris sebelum tanda tangan,
   // tanpa alamat, tanpa jumlah pengguna. Saat insiden, baris ini yang
   // dibaca — bukan storage.
+  // 0252 (usulan fase 3 0251): native masuk menambah " est <n> build <n>"
+  // SETELAH total — persis dua angka yang baru saja menghitung gasLimit
+  // di atas (gasLimit = floor(max(est, build) x 1,2)), supaya
+  // rekonsiliasi tahu dari mana basis berasal (swap nyata 21 November:
+  // basis 348.327 terbaca dari gasLimit, asal usulnya tidak). Token masuk
+  // tidak berubah: barisnya tetap berakhir di total.
   try {
     console.info('[fluxio swap] execute ' + networkKey + ' quote ' + quoteId +
       ' ceilings reset/approve/swap none/none/' + (displayedSwapCeilWei ?? 'none') +
-      ' total ' + (displayedSwapCeilWei ?? 'none'));
+      ' total ' + (displayedSwapCeilWei ?? 'none') +
+      (isTokenIn ? '' : ' est ' + estimatedGas + ' build ' + build.gasRaw));
   } catch {
     // Logging must never block the flow.
   }
-  const signedMaxFeePerGas = isTokenIn && displayedSwapCeilWei == null ? null : evmSwapService.pickSignedMaxFeePerGas({
+  const signedMaxFeePerGas = displayedSwapCeilWei == null ? null : evmSwapService.pickSignedMaxFeePerGas({
     freshMaxFeePerGas: maxFeePerGas,
     baseFeePerGas,
     maxPriorityFeePerGas,
@@ -4780,10 +4798,11 @@ const internalMessageHandlers = {
     if (!entry) {
       throw new Error('SWAP_QUOTE_EXPIRED: The quote has expired. Refresh the quote and try again.');
     }
-    // EVM preview (prompt 0219, tahap A): display-only fee ceiling from
-    // the product RPC path — floor(gasEstimate × 1,2) × (baseFee × 2 +
-    // tip), the exact Send-screen math 0213 proved on chain. No build,
-    // no rent concept, no priority-fee feedback.
+    // EVM preview (prompt 0219, tahap A; gas basis replaced by 0251): the
+    // fee ceiling from the product RPC path — gas limit × (baseFee × 2 +
+    // tip). The tahap A "no build" rule ended with 0227 Revisi 1 (Base,
+    // L1 fee) and 0251 (every network, native-in gas estimate) — see the
+    // native-in branch below. No rent concept, no priority-fee feedback.
     if (entry.kind === 'evm') {
       // Tahap C (prompt 0223, owner K3): a token-in quote previews TWO
       // ceilings — the approve's from a LIVE estimateGas on the real
@@ -4869,7 +4888,81 @@ const internalMessageHandlers = {
           maxFeeFormatted: formatUnits(totalMaxFeeWei, 18)
         };
       }
-      const fees = await evmSwapService.estimateEvmSwapFeeWei({ networkKey: entry.networkKey, gasEstimate: entry.gasEstimate });
+      // Prompt 0251 (catatan 19): the native-in ceiling's GAS now comes
+      // from a real eth_estimateGas over the real build calldata of the
+      // DISPLAYED route — x1,3 over max(estimate, build gas), mirroring
+      // the basis EXECUTE signs (see computeNativePreviewGas). The quote
+      // (GET /routes) carries no calldata, so this needs ONE Kyber build
+      // per Review on every EVM swap network — the user's public address
+      // therefore reaches Kyber when Review opens, not only at Confirm
+      // (owner approved; Base already did this for the L1 fee since 0227
+      // Revisi 1; Privacy.jsx says "review or confirm"). When the build,
+      // its verification or the simulation fails, the ceiling FALLS BACK
+      // to the pre-0251 figure (quote gas x1,2) and the trace says
+      // 'quote' (owner Opsi A): the ceiling is still enforced by the
+      // cutter, and EXECUTE still simulates the FRESH build before any
+      // signature. Only a failed FEE read leaves no ceiling at all — then
+      // this handler throws, the popup holds Confirm (0241) and EXECUTE
+      // would refuse anyway (fail closed).
+      const evmAddrNative = walletService.getAccountForNetwork(wallet, entry.networkKey).address;
+      const [feeNow, simulated] = await Promise.all([
+        evmSwapService.getEvmFeePerGas({ networkKey: entry.networkKey }),
+        (async () => {
+          let previewBuild;
+          try {
+            previewBuild = await evmSwapService.buildEvmSwapTransaction({
+              networkKey: entry.networkKey,
+              routeSummary: entry.routeSummary,
+              sender: evmAddrNative,
+              recipient: evmAddrNative,
+              slippageBps: entry.slippageBps
+            });
+            // Same pure checks EXECUTE runs on its own build: a build
+            // that does not match the displayed quote is never simulated.
+            evmSwapService.verifyEvmSwapBuild({
+              build: previewBuild,
+              expectedRouterAddress: entry.routerAddress,
+              expectedAmountInRaw: entry.inAmountRaw,
+              expectedValueRaw: entry.inAmountRaw,
+              freshAmountOutRaw: entry.outAmountRaw,
+              chainId: NETWORKS[entry.networkKey].chainId,
+              expectedChainId: NETWORKS[entry.networkKey].chainId
+            });
+          } catch {
+            return { build: null, estimatedGas: null, fallback: 'build' };
+          }
+          try {
+            const estimatedGas = await evmSwapService.estimateEvmGas({
+              networkKey: entry.networkKey,
+              from: evmAddrNative,
+              to: previewBuild.routerAddress,
+              valueRaw: previewBuild.transactionValueRaw,
+              data: previewBuild.calldata
+            });
+            return { build: previewBuild, estimatedGas, fallback: null };
+          } catch {
+            return { build: previewBuild, estimatedGas: null, fallback: 'simulation' };
+          }
+        })()
+      ]);
+      const previewGas = evmSwapService.computeNativePreviewGas({
+        estimatedGas: simulated.estimatedGas,
+        buildGas: simulated.build ? simulated.build.gasRaw : null,
+        quoteGas: entry.gasEstimate
+      });
+      const fees = { gasLimit: previewGas.gasLimit, maxFeePerGas: feeNow.maxFeePerGas, maxFeeWei: previewGas.gasLimit * feeNow.maxFeePerGas };
+      // One line per preview, no address and no user amount: which gas
+      // figure the ceiling stands on. Read together with the
+      // '[fluxio swap] execute' line when reconciling a real swap.
+      try {
+        console.info('[fluxio swap] preview ' + entry.networkKey + ' native gas ' + previewGas.source + ' ' + previewGas.basisGas +
+          ' margin ' + previewGas.marginLabel +
+          ' est ' + (simulated.estimatedGas ?? 'none') + ' build ' + (simulated.build ? simulated.build.gasRaw : 'none') +
+          ' quote ' + entry.gasEstimate + (simulated.fallback ? ' fallback ' + simulated.fallback : '') +
+          ' ceiling ' + fees.maxFeeWei);
+      } catch {
+        // Logging must never block the flow.
+      }
       // Pagar (g2), prompt 0220 Revisi 3 (owner keputusan 1; CONSTRUCTIVE
       // since 0227 Revisi 1): the number this preview puts on the Review
       // screen is remembered on the cached quote, and EXECUTE enforces it
@@ -4883,12 +4976,13 @@ const internalMessageHandlers = {
       // calldata; the stored gas ceiling above stays gas-only (see the
       // token-in comment). Oracle networks are detected by CONSTANT —
       // ethereum/bnb never make this call.
-      const evmAddrNative = walletService.getAccountForNetwork(wallet, entry.networkKey).address;
-      const l1FeeWeiNative = await previewEvmSwapL1FeeWei(entry, evmAddrNative, { gasLimit: fees.gasLimit, maxFeePerGas: fees.maxFeePerGas, valueRaw: entry.inAmountRaw });
+      const l1FeeWeiNative = await previewEvmSwapL1FeeWei(entry, evmAddrNative, { gasLimit: fees.gasLimit, maxFeePerGas: fees.maxFeePerGas, valueRaw: entry.inAmountRaw, build: simulated.build });
       const displayTotalWei = fees.maxFeeWei + l1FeeWeiNative;
       return {
         kind: 'evm',
         nativeSymbol: NETWORKS[entry.networkKey].nativeCurrency.symbol,
+        gasSource: previewGas.source,
+        gasMargin: previewGas.marginLabel,
         gasLimit: String(fees.gasLimit),
         maxFeePerGas: String(fees.maxFeePerGas),
         l1FeeWei: String(l1FeeWeiNative),

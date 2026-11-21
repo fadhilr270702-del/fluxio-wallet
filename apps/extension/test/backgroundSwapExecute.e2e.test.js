@@ -1918,7 +1918,7 @@ describe('background.bundle.js — EVM swap quotes, tahap A (prompt 0219)', () =
     delete globalThis.chrome;
   }, E2E_TIMEOUT_MS);
 
-  it('PREVIEW_SWAP_FEES bnb: Max network fee = floor(gas x 1,2) x maxFeePerGas with the 0213 RPC shape (baseFee 0x0, tip 0x2faf080)', async () => {
+  it('PREVIEW_SWAP_FEES bnb when the Kyber build is unavailable (this tahap A mock serves no build route): the 0251 FALLBACK — Max network fee = floor(quote gas x 1,2) x maxFeePerGas with the 0213 RPC shape (baseFee 0x0, tip 0x2faf080), gasSource quote', async () => {
     const { listeners } = installFakeChromeForBackground();
     await importFreshBundle();
     await importWallet(listeners);
@@ -1929,6 +1929,8 @@ describe('background.bundle.js — EVM swap quotes, tahap A (prompt 0219)', () =
     expect(preview.error).toBeUndefined();
     expect(preview.response.kind).toBe('evm');
     expect(preview.response.nativeSymbol).toBe('BNB');
+    expect(preview.response.gasSource).toBe('quote'); // 0251: build gagal -> fallback, angka pra 0251 persis
+    expect(preview.response.gasMargin).toBe('1.2');
     expect(preview.response.gasLimit).toBe('322597'); // floor(268831 * 12 / 10)
     expect(preview.response.maxFeePerGas).toBe('50000000'); // 0 * 2 + 0,05 gwei
     expect(preview.response.maxFeeWei).toBe('16129850000000');
@@ -2034,12 +2036,13 @@ describe('background.bundle.js — EVM swap EXECUTE, tahap B (prompt 0220; fixtu
       buildMutator = null,
       balanceHex = '0x2386f26fc10000', // 0.01 BNB — comfortably enough
       estimateGasHex = '0x41a1f', // 268831, the fixture's own gas
+      estimateGasHexes = null, // 0251: queue per eth_estimateGas call (last repeats) — PREVIEW's simulation, then EXECUTE's
       estimateGasError = null,
       tipHex = '0x2faf080', // 0,05 gwei
       tipHexes = null, // queue (per eth_maxPriorityFeePerGas call, last repeats) — the (g2) tests raise the tip BETWEEN preview and execute
       receipts = [null]
     } = opts;
-    const capture = { kyberRoutes: 0, kyberBuilds: 0, methods: [], sendRawParams: [], receiptCalls: 0, tipCalls: 0 };
+    const capture = { kyberRoutes: 0, kyberBuilds: 0, methods: [], sendRawParams: [], receiptCalls: 0, tipCalls: 0, estimateCalls: 0 };
     globalThis.fetch = async (url, options = {}) => {
       const u = String(url);
       if (u.includes('lite-api.jup.ag')) {
@@ -2067,7 +2070,8 @@ describe('background.bundle.js — EVM swap EXECUTE, tahap B (prompt 0220; fixtu
       if (method === 'eth_getTransactionCount') return rpc('0x3');
       if (method === 'eth_estimateGas') {
         if (estimateGasError) return { ok: true, status: 200, json: async () => ({ jsonrpc: '2.0', id: 1, error: estimateGasError }) };
-        return rpc(estimateGasHex);
+        const estimateQueue = estimateGasHexes || [estimateGasHex];
+        return rpc(estimateQueue[Math.min(capture.estimateCalls++, estimateQueue.length - 1)]);
       }
       if (method === 'eth_sendRawTransaction') {
         capture.sendRawParams.push(params[0]);
@@ -2187,6 +2191,8 @@ describe('background.bundle.js — EVM swap EXECUTE, tahap B (prompt 0220; fixtu
       fetchedAt: Date.now() - 31000
     });
     const quoteId = await quoteBnbToUsdt(listeners);
+    // 0251 (keputusan 5): EXECUTE native masuk gagal tertutup tanpa plafon tersimpan — jalur nyata selalu PREVIEW dulu (Review).
+    expect((await send(listeners, 'FLUXIO_INTERNAL_PREVIEW_SWAP_FEES', { quoteId })).error).toBeUndefined();
     const result = await send(listeners, 'FLUXIO_INTERNAL_EXECUTE_SWAP', { quoteId, networkKey: 'bnb' });
     expect(result.error).toBeUndefined();
     expect(result.response.signature).toBe(EVM_TX_HASH); // went through — check skipped, not failed
@@ -2271,14 +2277,17 @@ describe('background.bundle.js — EVM swap EXECUTE, tahap B (prompt 0220; fixtu
     const { listeners } = installFakeChromeForBackground();
     await importFreshBundle();
     await importWallet(listeners);
-    // PREVIEW sees 0,05 gwei (ceiling 322.597 x 5e7 = 16.129.850.000.000
-    // wei — the number the user READ); EXECUTE's fresh read sees 0,1 gwei
-    // (fresh fee 32.259.700.000.000 — double the displayed ceiling, yet
-    // far under the 3 gwei hard cap, so ONLY the new ceiling catches it).
+    // PREVIEW sees 0,05 gwei. Ceiling since 0251: max(estimate, build gas)
+    // 268.831 x1,3 = 349.480 gas x 5e7 = 17.474.000.000.000 wei — the
+    // number the user READ. EXECUTE's fresh read sees 0,1 gwei: the signed
+    // gasLimit 322.597 x 1e8 = 32.259.700.000.000 is far above it, and
+    // the cut rate 17.474.000.000.000 / 322.597 = 54.166.653 sits below
+    // the fresh inclusion floor 1e8 — yet far under the 3 gwei hard cap,
+    // so ONLY the displayed ceiling catches it.
     const capture = installEvmExecuteMock({ tipHexes: ['0x2faf080', '0x5f5e100'] });
     const quoteId = await quoteBnbToUsdt(listeners);
     const preview = await send(listeners, 'FLUXIO_INTERNAL_PREVIEW_SWAP_FEES', { quoteId });
-    expect(preview.response.maxFeeWei).toBe('16129850000000');
+    expect(preview.response.maxFeeWei).toBe('17474000000000');
 
     const result = await send(listeners, 'FLUXIO_INTERNAL_EXECUTE_SWAP', { quoteId, networkKey: 'bnb' });
     expect(result.error).toBeUndefined();
@@ -2290,13 +2299,13 @@ describe('background.bundle.js — EVM swap EXECUTE, tahap B (prompt 0220; fixtu
     // the NEW fee from the fresh tip).
     const preview2 = await send(listeners, 'FLUXIO_INTERNAL_PREVIEW_SWAP_FEES', { quoteId: result.response.quote.quoteId });
     expect(preview2.error).toBeUndefined();
-    expect(preview2.response.maxFeeWei).toBe('32259700000000');
+    expect(preview2.response.maxFeeWei).toBe('34948000000000'); // 349.480 x 1e8
 
     delete globalThis.fetch;
     delete globalThis.chrome;
   }, E2E_TIMEOUT_MS);
 
-  it('pagar (g2) pass-through: a fresh fee AT the displayed ceiling executes exactly as before (the success path is unchanged)', async () => {
+  it('pagar (g2) pass-through: a fresh fee WITHIN the displayed ceiling executes exactly as before (the success path is unchanged; since 0251 the ceiling 349.480 gas sits 8,33% above the signed 322.597)', async () => {
     const { listeners } = installFakeChromeForBackground();
     await importFreshBundle();
     await importWallet(listeners);
@@ -2304,11 +2313,100 @@ describe('background.bundle.js — EVM swap EXECUTE, tahap B (prompt 0220; fixtu
     const capture = installEvmExecuteMock({ receipts: [receipt] });
     const quoteId = await quoteBnbToUsdt(listeners);
     const preview = await send(listeners, 'FLUXIO_INTERNAL_PREVIEW_SWAP_FEES', { quoteId });
-    expect(preview.response.maxFeeWei).toBe('16129850000000');
+    expect(preview.response.maxFeeWei).toBe('17474000000000');
     const result = await send(listeners, 'FLUXIO_INTERNAL_EXECUTE_SWAP', { quoteId, networkKey: 'bnb' });
     expect(result.error).toBeUndefined();
     expect(result.response.signature).toBe(EVM_TX_HASH);
     expect(capture.sendRawParams.length).toBeGreaterThanOrEqual(1);
+    delete globalThis.fetch;
+    delete globalThis.chrome;
+  }, E2E_TIMEOUT_MS);
+
+  it('(0251) BNB Chain native masuk: PREVIEW berdiri di atas eth_estimateGas NYATA atas build nyata — basis max(estimasi, gas build) 268.831 x1,3 = 349.480 gas, plafon 17.474.000.000.000 wei, tepat SATU build Kyber', async () => {
+    const { listeners } = installFakeChromeForBackground();
+    await importFreshBundle();
+    await importWallet(listeners);
+    const infoSpy = vi.spyOn(console, 'info');
+    const capture = installEvmExecuteMock();
+    const quoteId = await quoteBnbToUsdt(listeners);
+    const preview = await send(listeners, 'FLUXIO_INTERNAL_PREVIEW_SWAP_FEES', { quoteId });
+    expect(preview.error).toBeUndefined();
+    expect(preview.response.gasSource).toBe('estimate');
+    expect(preview.response.gasMargin).toBe('1.3');
+    expect(preview.response.gasLimit).toBe('349480'); // floor(268.831 x 13 / 10)
+    expect(preview.response.maxFeeWei).toBe('17474000000000'); // 349.480 x 5e7, tanpa l1 (bukan jaringan ber oracle)
+    expect(capture.kyberBuilds).toBe(1);
+    expect(capture.estimateCalls).toBe(1);
+    const traces = infoSpy.mock.calls.map((c) => String(c[0])).filter((l) => l.startsWith('[fluxio swap] preview '));
+    expect(traces).toEqual(['[fluxio swap] preview bnb native gas estimate 268831 margin 1.3 est 268831 build 268831 quote 268831 ceiling 17474000000000']);
+    expect(/0x[0-9a-fA-F]{40}/.test(traces[0])).toBe(false); // tanpa alamat
+    infoSpy.mockRestore();
+    delete globalThis.fetch;
+    delete globalThis.chrome;
+  }, E2E_TIMEOUT_MS);
+
+  it('(0251) ruang 8,33% di BNB Chain (baseFee 0, pemotong tanpa ruang): estimasi naik 7,9% antara Review dan Confirm (268.831 lalu 290.000) TETAP ditandatangani', async () => {
+    const { listeners } = installFakeChromeForBackground();
+    await importFreshBundle();
+    await importWallet(listeners);
+    const capture = installEvmExecuteMock({ estimateGasHexes: ['0x41a1f', '0x46cd0'] }); // PREVIEW 268.831, EXECUTE 290.000
+    const quoteId = await quoteBnbToUsdt(listeners);
+    const preview = await send(listeners, 'FLUXIO_INTERNAL_PREVIEW_SWAP_FEES', { quoteId });
+    expect(preview.response.maxFeeWei).toBe('17474000000000');
+    // EXECUTE: gasLimit floor(290.000 x 1,2) = 348.000 <= 349.480, jadi
+    // plafon / gasLimit = 50.212.643 >= tip pasar 5e7: tidak memantul.
+    // (Sebelum 0251 plafon 322.597 gas: 16.129.850.000.000 / 348.000 =
+    // 46.350.143 < 5e7 dan Confirm ini memantul.)
+    const result = await send(listeners, 'FLUXIO_INTERNAL_EXECUTE_SWAP', { quoteId, networkKey: 'bnb' });
+    expect(result.error).toBeUndefined();
+    expect(result.response.quoteChanged).toBeUndefined();
+    expect(result.response.signature).toBe(EVM_TX_HASH);
+    expect(capture.sendRawParams.length).toBe(1);
+    delete globalThis.fetch;
+    delete globalThis.chrome;
+  }, E2E_TIMEOUT_MS);
+
+  it('(0251) di luar ruang itu plafon tetap batas keras: estimasi naik 9,0% (293.100) memantul EVM_SWAP_FEE_ABOVE_DISPLAYED, tidak ada tanda tangan', async () => {
+    const { listeners } = installFakeChromeForBackground();
+    await importFreshBundle();
+    await importWallet(listeners);
+    const capture = installEvmExecuteMock({ estimateGasHexes: ['0x41a1f', '0x478ec'] }); // PREVIEW 268.831, EXECUTE 293.100
+    const quoteId = await quoteBnbToUsdt(listeners);
+    const preview = await send(listeners, 'FLUXIO_INTERNAL_PREVIEW_SWAP_FEES', { quoteId });
+    expect(preview.response.maxFeeWei).toBe('17474000000000');
+    // gasLimit floor(293.100 x 1,2) = 351.720 > 349.480: plafon / gasLimit
+    // = 49.681.564 < lantai inklusi 5e7 -> menolak.
+    const result = await send(listeners, 'FLUXIO_INTERNAL_EXECUTE_SWAP', { quoteId, networkKey: 'bnb' });
+    expect(result.error).toBeUndefined();
+    expect(result.response.quoteChanged).toBe(true);
+    expect(result.response.code).toBe('EVM_SWAP_FEE_ABOVE_DISPLAYED');
+    expect(capture.sendRawParams.length).toBe(0);
+    delete globalThis.fetch;
+    delete globalThis.chrome;
+  }, E2E_TIMEOUT_MS);
+
+  it('(0251, keputusan 5) EXECUTE native masuk TANPA PREVIEW: tidak ada tanda tangan sama sekali — bounce EVM_SWAP_FEE_ABOVE_DISPLAYED dengan id baru; setelah PREVIEW id baru itu, EXECUTE menandatangani', async () => {
+    const { listeners } = installFakeChromeForBackground();
+    await importFreshBundle();
+    await importWallet(listeners);
+    const capture = installEvmExecuteMock();
+    const quoteId = await quoteBnbToUsdt(listeners);
+    // SENGAJA tanpa PREVIEW: tidak ada plafon tersimpan di entry.
+    const bounced = await send(listeners, 'FLUXIO_INTERNAL_EXECUTE_SWAP', { quoteId, networkKey: 'bnb' });
+    expect(bounced.error).toBeUndefined();
+    expect(bounced.response.quoteChanged).toBe(true);
+    expect(bounced.response.code).toBe('EVM_SWAP_FEE_ABOVE_DISPLAYED');
+    expect(bounced.response.signature).toBeUndefined();
+    expect(capture.sendRawParams.length).toBe(0);
+    const newId = bounced.response.quote.quoteId;
+    expect(newId).not.toBe(quoteId);
+    // Jalur yang benar: Review dirender ulang, PREVIEW menyimpan plafon, baru EXECUTE.
+    const preview = await send(listeners, 'FLUXIO_INTERNAL_PREVIEW_SWAP_FEES', { quoteId: newId });
+    expect(preview.error).toBeUndefined();
+    const result = await send(listeners, 'FLUXIO_INTERNAL_EXECUTE_SWAP', { quoteId: newId, networkKey: 'bnb' });
+    expect(result.error).toBeUndefined();
+    expect(result.response.signature).toBe(EVM_TX_HASH);
+    expect(capture.sendRawParams.length).toBe(1);
     delete globalThis.fetch;
     delete globalThis.chrome;
   }, E2E_TIMEOUT_MS);
@@ -2357,12 +2455,14 @@ describe('background.bundle.js — EVM swap EXECUTE, tahap B (prompt 0220; fixtu
     expect(feeQuoteImpact).toBeLessThan(0.0085);
     const quoteId = quoteRes.response.quoteId;
 
+    // 0251 (keputusan 5): EXECUTE native masuk gagal tertutup tanpa plafon tersimpan — jalur nyata selalu PREVIEW dulu (Review).
+    expect((await send(listeners, 'FLUXIO_INTERNAL_PREVIEW_SWAP_FEES', { quoteId })).error).toBeUndefined();
     const result = await send(listeners, 'FLUXIO_INTERNAL_EXECUTE_SWAP', { quoteId, networkKey: 'bnb' });
     expect(result.error).toBeUndefined();
     expect(result.response.signature).toBe(EVM_TX_HASH);
     expect(result.response.explorerUrl).toContain(EVM_TX_HASH);
     expect(capture.kyberRoutes).toBe(2); // the displayed quote + the fresh one
-    expect(capture.kyberBuilds).toBe(1);
+    expect(capture.kyberBuilds).toBe(2); // 0251: PREVIEW's build of the displayed route + EXECUTE's build of the fresh one
     expect(capture.methods).toContain('eth_estimateGas');
     expect(capture.methods).toContain('eth_getTransactionCount');
 
@@ -2409,6 +2509,8 @@ describe('background.bundle.js — EVM swap EXECUTE, tahap B (prompt 0220; fixtu
     await importWallet(listeners);
     const capture = installEvmExecuteMock({ receipts: [{ status: '0x0', gasUsed: '0x41a1f', logs: [] }] });
     const quoteId = await quoteBnbToUsdt(listeners);
+    // 0251 (keputusan 5): EXECUTE native masuk gagal tertutup tanpa plafon tersimpan — jalur nyata selalu PREVIEW dulu (Review).
+    expect((await send(listeners, 'FLUXIO_INTERNAL_PREVIEW_SWAP_FEES', { quoteId })).error).toBeUndefined();
     const result = await send(listeners, 'FLUXIO_INTERNAL_EXECUTE_SWAP', { quoteId, networkKey: 'bnb' });
     expect(result.error).toBeUndefined();
     const status = await send(listeners, 'FLUXIO_INTERNAL_SWAP_STATUS', { signature: EVM_TX_HASH, networkKey: 'bnb' });
@@ -2639,7 +2741,14 @@ describe('background.bundle.js — EVM swap token-in + approve, tahap C (prompt 
       receipts: [null]
     });
     const quoteId = await quoteUsdtToBnb(listeners);
+    const infoSpy = vi.spyOn(console, 'info');
     const result = await send(listeners, 'FLUXIO_INTERNAL_EXECUTE_SWAP', { quoteId, networkKey: 'bnb' });
+    // 0252: token masuk TIDAK berubah — baris execute jalur satu transaksi
+    // berakhir di "total <wei>", tanpa segmen est/build (itu hanya native masuk).
+    const execLinesK1 = infoSpy.mock.calls.map((c) => String(c[0])).filter((m) => m.startsWith('[fluxio swap] execute'));
+    infoSpy.mockRestore();
+    expect(execLinesK1.length).toBe(1);
+    expect(/^\[fluxio swap\] execute bnb quote \S+ ceilings reset\/approve\/swap none\/none\/\d+ total \d+$/.test(execLinesK1[0])).toBe(true);
     expect(result.error).toBeUndefined();
     expect(result.response.stage).toBeUndefined();
     expect(result.response.signature).toBe('0x' + 'aa'.repeat(32));
@@ -3218,12 +3327,14 @@ describe('background.bundle.js — EVM swap on Ethereum and Base (prompt 0227, 0
       await importWallet(listeners);
       const capture = installNetworkMock(net);
       const quoteId = await quoteNativeIn(listeners, netKey);
+      // 0251 (keputusan 5): EXECUTE native masuk gagal tertutup tanpa plafon tersimpan — jalur nyata selalu PREVIEW dulu (Review).
+      expect((await send(listeners, 'FLUXIO_INTERNAL_PREVIEW_SWAP_FEES', { quoteId })).error).toBeUndefined();
       const result = await send(listeners, 'FLUXIO_INTERNAL_EXECUTE_SWAP', { quoteId, networkKey: netKey });
       expect(result.error).toBeUndefined();
       expect(result.response.signature).toBe('0x' + 'aa'.repeat(32));
       expect(result.response.explorerUrl).toContain(net.explorerHost);
       expect(capture.sendRawParams.length).toBe(1);
-      expect(capture.kyberBuilds).toBe(1);
+      expect(capture.kyberBuilds).toBe(2); // 0251: PREVIEW's build + EXECUTE's build, both on this network's slug (asserted below)
       expect(capture.kyberUrls.every((u) => u.includes(`/${net.slug}/`))).toBe(true);
       const [chainId, nonce, , , , to, value] = readSignedType2Items(capture.sendRawParams[0]);
       expect(chainId).toBe(net.chainId); // 0225 K5: from NETWORKS, never 56
@@ -3480,6 +3591,8 @@ describe('background.bundle.js — EVM swap on Ethereum and Base (prompt 0227, 0
       receipts: ethReceipts
     });
     const quoteId = await quoteNativeIn(listeners, 'ethereum');
+    // 0251 (keputusan 5): EXECUTE native masuk gagal tertutup tanpa plafon tersimpan — jalur nyata selalu PREVIEW dulu (Review).
+    expect((await send(listeners, 'FLUXIO_INTERNAL_PREVIEW_SWAP_FEES', { quoteId })).error).toBeUndefined();
     const result = await send(listeners, 'FLUXIO_INTERNAL_EXECUTE_SWAP', { quoteId, networkKey: 'ethereum' });
     expect(result.error).toBeUndefined();
     // Bangun receipt dengan log Transfer USDC ke dompet (alamat dari entry
@@ -3555,6 +3668,7 @@ describe('background.bundle.js — g2 constructive + L1 fee preview (prompt 0227
   const Q_BASE = JSON.parse(readFileSync(path.join(FIXTURE_DIR_R1, 'kyber-quote-base-native2usdc.json'), 'utf8'));
   const B_BASE = JSON.parse(readFileSync(path.join(FIXTURE_DIR_R1, 'kyber-build-base-native2usdc.json'), 'utf8'));
   const Q_ETH = JSON.parse(readFileSync(path.join(FIXTURE_DIR_R1, 'kyber-quote-eth-native2usdc.json'), 'utf8'));
+  const B_ETH = JSON.parse(readFileSync(path.join(FIXTURE_DIR_R1, 'kyber-build-eth-native2usdc.json'), 'utf8'));
   const USDC_BASE_R1 = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
   const USDC_ETH_R1 = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48';
   const L1_FEE = 11195561607n; // the REAL fase 1 oracle answer
@@ -3593,8 +3707,13 @@ describe('background.bundle.js — g2 constructive + L1 fee preview (prompt 0227
   }
 
   /** Mock with a BASE FEE QUEUE (per eth_getBlockByNumber call) + the L1 oracle. */
-  function installR1Mock({ slug, quoteJson, buildJson, baseFeeHexes, tipHex = '0xf4240', estimateGasHex = '0x41a1f' }) {
-    const capture = { kyberBuilds: 0, sendRawParams: [], blockCalls: 0, l1Calls: 0, callDatas: [] };
+  function installR1Mock({ slug, quoteJson, buildJson, baseFeeHexes, tipHex = '0xf4240', estimateGasHex = '0x41a1f', estimateGasQueue = null, buildJsons = null }) {
+    // 0251: estimateGasQueue = per eth_estimateGas FETCH (hex, or
+    // { error } for a JSON-RPC error body; last repeats). A failing call
+    // is retried on the network's fallback endpoint by the product, so a
+    // simulation that must FAIL needs one { error } per endpoint.
+    // buildJsons = per Kyber build call (null = a failed build).
+    const capture = { kyberBuilds: 0, sendRawParams: [], blockCalls: 0, l1Calls: 0, callDatas: [], estimateCalls: 0 };
     globalThis.fetch = async (url, options = {}) => {
       const u = String(url);
       if (u.startsWith(`https://aggregator-api.kyberswap.com/${slug}/api/v1/routes`)) {
@@ -3602,7 +3721,8 @@ describe('background.bundle.js — g2 constructive + L1 fee preview (prompt 0227
       }
       if (u.startsWith(`https://aggregator-api.kyberswap.com/${slug}/api/v1/route/build`)) {
         capture.kyberBuilds++;
-        return { ok: true, status: 200, json: async () => buildJson };
+        const thisBuild = buildJsons ? buildJsons[Math.min(capture.kyberBuilds - 1, buildJsons.length - 1)] : buildJson;
+        return { ok: true, status: 200, json: async () => thisBuild };
       }
       const { method, params } = JSON.parse(options.body);
       const rpc = (result) => ({ ok: true, status: 200, json: async () => ({ jsonrpc: '2.0', id: 1, result }) });
@@ -3622,7 +3742,12 @@ describe('background.bundle.js — g2 constructive + L1 fee preview (prompt 0227
       }
       if (method === 'eth_getBalance') return rpc('0x2386f26fc10000');
       if (method === 'eth_getTransactionCount') return rpc('0x1');
-      if (method === 'eth_estimateGas') return rpc(estimateGasHex);
+      if (method === 'eth_estimateGas') {
+        const queue = estimateGasQueue || [estimateGasHex];
+        const item = queue[Math.min(capture.estimateCalls++, queue.length - 1)];
+        if (item && typeof item === 'object') return { ok: true, status: 200, json: async () => ({ jsonrpc: '2.0', id: 1, error: item.error }) };
+        return rpc(item);
+      }
       if (method === 'eth_sendRawTransaction') {
         capture.sendRawParams.push(params[0]);
         return rpc('0x' + 'aa'.repeat(32));
@@ -3633,7 +3758,7 @@ describe('background.bundle.js — g2 constructive + L1 fee preview (prompt 0227
     return capture;
   }
 
-  it('the REAL bounce, fixed constructively: PREVIEW at baseFee 5e6 then EXECUTE at 6e6 SIGNS at exactly floor(ceiling / gasLimit) = 11.000.000 wei instead of bouncing — proven from the signed bytes (chainId 8453, value 1e15)', async () => {
+  it('the cutter, constructively: PREVIEW at baseFee 5e6 then EXECUTE at 6e6 (market 13e6) SIGNS at exactly floor(ceiling / gasLimit) = 11.916.673 wei instead of bouncing — proven from the signed bytes (chainId 8453, value 1e15; ceiling basis since 0251: max(estimate, build gas) x1,3)', async () => {
     const { listeners } = installFakeChromeForBackground();
     await importFreshBundle();
     await importWallet(listeners);
@@ -3647,11 +3772,14 @@ describe('background.bundle.js — g2 constructive + L1 fee preview (prompt 0227
     expect(quote.error).toBeUndefined();
     const preview = await send(listeners, 'FLUXIO_INTERNAL_PREVIEW_SWAP_FEES', { quoteId: quote.response.quoteId });
     expect(preview.error).toBeUndefined();
-    // Gas ceiling 396.597 x 11e6 = 4.362.567.000.000; the DISPLAYED total
+    // Gas ceiling since 0251: this mock's estimate (268.831) sits BELOW
+    // the build gas (330.498), so the basis is the build gas — x1,3 =
+    // 429.647 gas x 11e6 = 4.726.117.000.000; the DISPLAYED total
     // additionally carries the L1 estimate (K2) — but the ENFORCED gas
     // ceiling stays gas only, which the signed fee below proves.
     expect(preview.response.l1FeeWei).toBe(L1_FEE.toString());
-    expect(BigInt(preview.response.maxFeeWei)).toBe(4362567000000n + L1_FEE);
+    expect(preview.response.gasLimit).toBe('429647');
+    expect(BigInt(preview.response.maxFeeWei)).toBe(4726117000000n + L1_FEE);
     expect(capture.l1Calls).toBe(1);
     const result = await send(listeners, 'FLUXIO_INTERNAL_EXECUTE_SWAP', { quoteId: quote.response.quoteId, networkKey: 'base' });
     expect(result.error).toBeUndefined();
@@ -3662,11 +3790,53 @@ describe('background.bundle.js — g2 constructive + L1 fee preview (prompt 0227
     expect(chainId).toBe(8453n);
     expect(value).toBe(1000000000000000n);
     expect(gasLimit).toBe(396597n); // estimate 268.831 < build gas 330.498 -> x1,2 of the build gas
-    expect(maxFee).toBe(11000000n); // floor(4.362.567.000.000 / 396.597) — the CUT fee, exactly the ceiling rate
+    expect(maxFee).toBe(11916673n); // floor(4.726.117.000.000 / 396.597) — the CUT fee (market is 2 x 6e6 + 1e6 = 13e6), still above the inclusion floor 7e6
+    expect(gasLimit * maxFee <= 4726117000000n).toBe(true); // the stored gas only ceiling is enforced
     expect(tip <= maxFee).toBe(true);
     delete globalThis.fetch;
     delete globalThis.chrome;
   }, E2E_TIMEOUT_MS);
+
+  for (const c of [
+    { name: 'estimasi 402.727 DI ATAS gas build 330.498', estHex: '0x62527', est: 402727n },
+    { name: 'estimasi 268.831 DI BAWAH gas build 330.498', estHex: '0x41a1f', est: 268831n }
+  ]) {
+    it(`(0252) baris execute native masuk memuat est dan build yang dipakai menghitung gasLimit (${c.name}): gasLimit tersign = floor(max(est, build) x 1,2), tanpa alamat dan tanpa jumlah`, async () => {
+      const { listeners } = installFakeChromeForBackground();
+      await importFreshBundle();
+      await importWallet(listeners);
+      const capture = installR1Mock({ slug: 'base', quoteJson: Q_BASE, buildJson: B_BASE, baseFeeHexes: ['0x4c4b40'], estimateGasHex: c.estHex });
+      const quote = await send(listeners, 'FLUXIO_INTERNAL_GET_SWAP_QUOTE', {
+        networkKey: 'base', inputMint: 'native', outputMint: USDC_BASE_R1, amount: '0.001',
+        inputDecimals: 18, outputDecimals: 6, slippageBps: 50, inputSymbol: 'ETH', outputSymbol: 'USDC'
+      });
+      expect(quote.error).toBeUndefined();
+      const quoteId = quote.response.quoteId;
+      const preview = await send(listeners, 'FLUXIO_INTERNAL_PREVIEW_SWAP_FEES', { quoteId });
+      expect(preview.error).toBeUndefined();
+      const ceiling = (BigInt(preview.response.maxFeeWei) - L1_FEE).toString(); // plafon tersimpan = gas saja
+      const infoSpy = vi.spyOn(console, 'info');
+      const result = await send(listeners, 'FLUXIO_INTERNAL_EXECUTE_SWAP', { quoteId, networkKey: 'base' });
+      const execLines = infoSpy.mock.calls.map((x) => String(x[0])).filter((m) => m.startsWith('[fluxio swap] execute'));
+      infoSpy.mockRestore();
+      expect(result.error).toBeUndefined();
+      expect(capture.sendRawParams.length).toBe(1);
+      expect(execLines.length).toBe(1);
+      // Format persis: awalan 0231 R3 tidak berubah, segmen baru SETELAH total.
+      expect(execLines[0]).toBe('[fluxio swap] execute base quote ' + quoteId + ' ceilings reset/approve/swap none/none/' + ceiling + ' total ' + ceiling + ' est ' + c.est + ' build 330498');
+      const m = / est (\d+) build (\d+)$/.exec(execLines[0]);
+      const est = BigInt(m[1]);
+      const build = BigInt(m[2]);
+      const basis = est > build ? est : build;
+      const [, , , , gasLimit] = readTx(capture.sendRawParams[0]);
+      expect(gasLimit).toBe((basis * 12n) / 10n); // angka di baris = angka yang menghitung gasLimit tersign
+      expect((gasLimit * 10n) / 12n <= basis && basis - (gasLimit * 10n) / 12n <= 1n).toBe(true); // gasLimit / 1,2 kembali ke basis (selisih pembulatan paling banyak 1)
+      expect(/0x[0-9a-fA-F]{40}/.test(execLines[0])).toBe(false); // tanpa alamat
+      expect(execLines[0].includes('1000000000000000')).toBe(false); // tanpa jumlah swap (1e15 wei)
+      delete globalThis.fetch;
+      delete globalThis.chrome;
+    }, E2E_TIMEOUT_MS);
+  }
 
   it('gas that TRULY rose still refuses: a ceiling rate below the fresh inclusion floor returns EVM_SWAP_FEE_ABOVE_DISPLAYED with a new live id, nothing signed', async () => {
     const { listeners } = installFakeChromeForBackground();
@@ -3690,11 +3860,13 @@ describe('background.bundle.js — g2 constructive + L1 fee preview (prompt 0227
     delete globalThis.chrome;
   }, E2E_TIMEOUT_MS);
 
-  it('the L1 oracle is NEVER called for ethereum (detection by constant): PREVIEW answers gas only, zero oracle eth_call, zero Kyber build', async () => {
+  it('(0251, menggantikan "zero Kyber build") ethereum native masuk: TEPAT SATU build Kyber saat PREVIEW untuk estimateGas nyata (fixture build nyata, gas 456.277 x1,3 = 593.160), dan oracle L1 TETAP tidak pernah dipanggil (deteksi per konstanta)', async () => {
     const { listeners } = installFakeChromeForBackground();
     await importFreshBundle();
     await importWallet(listeners);
-    const capture = installR1Mock({ slug: 'ethereum', quoteJson: Q_ETH, buildJson: null, baseFeeHexes: ['0x8a0e9d0'] }); // baseFee 144,8 juta (fase 1)
+    const infoSpy = vi.spyOn(console, 'info');
+    // baseFee 144,8 juta (fase 1); estimasi = 456.277 (fase 1 0227 Revisi 3).
+    const capture = installR1Mock({ slug: 'ethereum', quoteJson: Q_ETH, buildJson: B_ETH, baseFeeHexes: ['0x8a0e9d0'], estimateGasHex: '0x6f655' });
     const quote = await send(listeners, 'FLUXIO_INTERNAL_GET_SWAP_QUOTE', {
       networkKey: 'ethereum', inputMint: 'native', outputMint: USDC_ETH_R1, amount: '0.002',
       inputDecimals: 18, outputDecimals: 6, slippageBps: 50, inputSymbol: 'ETH', outputSymbol: 'USDC'
@@ -3702,10 +3874,124 @@ describe('background.bundle.js — g2 constructive + L1 fee preview (prompt 0227
     expect(quote.error).toBeUndefined();
     const preview = await send(listeners, 'FLUXIO_INTERNAL_PREVIEW_SWAP_FEES', { quoteId: quote.response.quoteId });
     expect(preview.error).toBeUndefined();
+    expect(capture.kyberBuilds).toBe(1); // tepat satu, saat PREVIEW
+    expect(capture.estimateCalls).toBe(1);
+    expect(preview.response.gasSource).toBe('estimate');
+    expect(preview.response.gasLimit).toBe('593160'); // floor(456.277 x 13 / 10)
+    const maxFeePerGas = 2n * BigInt('0x8a0e9d0') + 100000000n; // baseFee x2 + lantai tip ethereum 1e8 (endpoint menjawab 1e6)
+    expect(preview.response.maxFeePerGas).toBe(maxFeePerGas.toString());
+    expect(BigInt(preview.response.maxFeeWei)).toBe(593160n * maxFeePerGas); // gas saja: tidak ada l1 di ethereum
     expect(preview.response.l1FeeWei).toBe('0');
     expect(capture.l1Calls).toBe(0);
-    expect(capture.kyberBuilds).toBe(0);
     expect(capture.callDatas.length).toBe(0); // no eth_call at all on this path
+    const traces = infoSpy.mock.calls.map((c) => String(c[0])).filter((l) => l.startsWith('[fluxio swap] preview '));
+    expect(traces).toEqual(['[fluxio swap] preview ethereum native gas estimate 456277 margin 1.3 est 456277 build 456277 quote 456277 ceiling ' + (593160n * maxFeePerGas).toString()]);
+    infoSpy.mockRestore();
+    delete globalThis.fetch;
+    delete globalThis.chrome;
+  }, E2E_TIMEOUT_MS);
+
+  it('(0251) Base native masuk dengan angka NYATA fase 1 0227: PREVIEW memakai eth_estimateGas 402.727 x1,3 = 523.545 gas, SATU build Kyber melayani gas dan l1Fee, lalu EXECUTE menandatangani fee pasar TANPA dipotong (plafon lama 396.597 gas harus memotong ke 9.027.146)', async () => {
+    const { listeners } = installFakeChromeForBackground();
+    await importFreshBundle();
+    await importWallet(listeners);
+    const infoSpy = vi.spyOn(console, 'info');
+    const capture = installR1Mock({ slug: 'base', quoteJson: Q_BASE, buildJson: B_BASE, baseFeeHexes: ['0x4c4b40'], estimateGasHex: '0x62527' }); // 402.727
+    const quote = await send(listeners, 'FLUXIO_INTERNAL_GET_SWAP_QUOTE', {
+      networkKey: 'base', inputMint: 'native', outputMint: USDC_BASE_R1, amount: '0.001',
+      inputDecimals: 18, outputDecimals: 6, slippageBps: 50, inputSymbol: 'ETH', outputSymbol: 'USDC'
+    });
+    expect(quote.error).toBeUndefined();
+    const preview = await send(listeners, 'FLUXIO_INTERNAL_PREVIEW_SWAP_FEES', { quoteId: quote.response.quoteId });
+    expect(preview.error).toBeUndefined();
+    expect(preview.response.gasSource).toBe('estimate');
+    expect(preview.response.gasMargin).toBe('1.3');
+    expect(preview.response.gasLimit).toBe('523545'); // floor(402.727 x 13 / 10)
+    expect(preview.response.l1FeeWei).toBe(L1_FEE.toString());
+    expect(BigInt(preview.response.maxFeeWei)).toBe(5758995000000n + L1_FEE); // 523.545 x 11e6, tampilan menambah l1
+    expect(capture.kyberBuilds).toBe(1); // SATU build untuk gas DAN l1Fee
+    expect(capture.l1Calls).toBe(1);
+    const traces = infoSpy.mock.calls.map((c) => String(c[0])).filter((l) => l.startsWith('[fluxio swap] preview '));
+    expect(traces).toEqual(['[fluxio swap] preview base native gas estimate 402727 margin 1.3 est 402727 build 330498 quote 330498 ceiling 5758995000000']);
+    expect(/0x[0-9a-fA-F]{40}/.test(traces[0])).toBe(false); // tanpa alamat
+    const result = await send(listeners, 'FLUXIO_INTERNAL_EXECUTE_SWAP', { quoteId: quote.response.quoteId, networkKey: 'base' });
+    expect(result.error).toBeUndefined();
+    expect(result.response.quoteChanged).toBeUndefined();
+    expect(capture.sendRawParams.length).toBe(1);
+    expect(capture.kyberBuilds).toBe(2); // + build segar milik EXECUTE
+    const [chainId, , tip, maxFee, gasLimit, , value] = readTx(capture.sendRawParams[0]);
+    expect(chainId).toBe(8453n);
+    expect(value).toBe(1000000000000000n);
+    expect(gasLimit).toBe(483272n); // floor(402.727 x 1,2), persis fase 1
+    expect(maxFee).toBe(11000000n); // fee PASAR: plafon gas saja 5.758.995.000.000 / 483.272 = 11.916.673 >= 11e6, tidak dipotong
+    expect(tip).toBe(1000000n);
+    expect(gasLimit * maxFee <= 5758995000000n).toBe(true); // plafon tersimpan (gas saja) ditegakkan
+    infoSpy.mockRestore();
+    delete globalThis.fetch;
+    delete globalThis.chrome;
+  }, E2E_TIMEOUT_MS);
+
+  it('(0251, Opsi A) simulasi GAGAL saat PREVIEW (kedua endpoint): plafon jatuh ke gas quote x1,2 = 396.597 gas dengan penanda "quote" di trace, Confirm tetap bisa, dan pemotong menegakkannya — tersign 9.027.146 = floor(4.362.567.000.000 / 483.272), angka fase 1', async () => {
+    const { listeners } = installFakeChromeForBackground();
+    await importFreshBundle();
+    await importWallet(listeners);
+    const infoSpy = vi.spyOn(console, 'info');
+    const revert = { error: { code: 3, message: 'execution reverted' } };
+    // PREVIEW: default + fallback endpoint sama sama menjawab error; EXECUTE: 402.727.
+    const capture = installR1Mock({ slug: 'base', quoteJson: Q_BASE, buildJson: B_BASE, baseFeeHexes: ['0x4c4b40'], estimateGasQueue: [revert, revert, '0x62527'] });
+    const quote = await send(listeners, 'FLUXIO_INTERNAL_GET_SWAP_QUOTE', {
+      networkKey: 'base', inputMint: 'native', outputMint: USDC_BASE_R1, amount: '0.001',
+      inputDecimals: 18, outputDecimals: 6, slippageBps: 50, inputSymbol: 'ETH', outputSymbol: 'USDC'
+    });
+    const preview = await send(listeners, 'FLUXIO_INTERNAL_PREVIEW_SWAP_FEES', { quoteId: quote.response.quoteId });
+    expect(preview.error).toBeUndefined(); // fallback, BUKAN kegagalan preview
+    expect(preview.response.gasSource).toBe('quote');
+    expect(preview.response.gasMargin).toBe('1.2');
+    expect(preview.response.gasLimit).toBe('396597'); // floor(330.498 x 12 / 10), angka pra 0251
+    expect(BigInt(preview.response.maxFeeWei)).toBe(4362567000000n + L1_FEE); // build berhasil, jadi l1 tetap dihitung
+    expect(capture.kyberBuilds).toBe(1);
+    const traces = infoSpy.mock.calls.map((c) => String(c[0])).filter((l) => l.startsWith('[fluxio swap] preview '));
+    expect(traces).toEqual(['[fluxio swap] preview base native gas quote 330498 margin 1.2 est none build 330498 quote 330498 fallback simulation ceiling 4362567000000']);
+    const result = await send(listeners, 'FLUXIO_INTERNAL_EXECUTE_SWAP', { quoteId: quote.response.quoteId, networkKey: 'base' });
+    expect(result.error).toBeUndefined();
+    expect(result.response.quoteChanged).toBeUndefined();
+    expect(capture.sendRawParams.length).toBe(1);
+    const [, , , maxFee, gasLimit] = readTx(capture.sendRawParams[0]);
+    expect(gasLimit).toBe(483272n);
+    expect(maxFee).toBe(9027146n); // DIPOTONG ke plafon fallback, masih di atas lantai inklusi 6e6
+    infoSpy.mockRestore();
+    delete globalThis.fetch;
+    delete globalThis.chrome;
+  }, E2E_TIMEOUT_MS);
+
+  it('(0251, Opsi A) build Kyber GAGAL saat PREVIEW: fallback gas quote x1,2 dengan penanda "fallback build", TIDAK ada percobaan build kedua untuk l1Fee (tampil tanpa l1), plafon tetap tersimpan', async () => {
+    const { listeners } = installFakeChromeForBackground();
+    await importFreshBundle();
+    await importWallet(listeners);
+    const infoSpy = vi.spyOn(console, 'info');
+    const capture = installR1Mock({ slug: 'base', quoteJson: Q_BASE, buildJsons: [null, B_BASE], baseFeeHexes: ['0x4c4b40'], estimateGasHex: '0x62527' });
+    const quote = await send(listeners, 'FLUXIO_INTERNAL_GET_SWAP_QUOTE', {
+      networkKey: 'base', inputMint: 'native', outputMint: USDC_BASE_R1, amount: '0.001',
+      inputDecimals: 18, outputDecimals: 6, slippageBps: 50, inputSymbol: 'ETH', outputSymbol: 'USDC'
+    });
+    const preview = await send(listeners, 'FLUXIO_INTERNAL_PREVIEW_SWAP_FEES', { quoteId: quote.response.quoteId });
+    expect(preview.error).toBeUndefined();
+    expect(preview.response.gasSource).toBe('quote');
+    expect(preview.response.gasLimit).toBe('396597');
+    expect(preview.response.l1FeeWei).toBe('0');
+    expect(preview.response.maxFeeWei).toBe('4362567000000'); // gas saja
+    expect(capture.kyberBuilds).toBe(1); // satu percobaan, tidak diulang untuk l1
+    expect(capture.estimateCalls).toBe(0); // tanpa calldata tidak ada yang disimulasikan
+    expect(capture.l1Calls).toBe(0);
+    const traces = infoSpy.mock.calls.map((c) => String(c[0])).filter((l) => l.startsWith('[fluxio swap] preview '));
+    expect(traces).toEqual(['[fluxio swap] preview base native gas quote 330498 margin 1.2 est none build none quote 330498 fallback build ceiling 4362567000000']);
+    // Plafon tersimpan: EXECUTE (build kedua berhasil) menandatangani di bawahnya.
+    const result = await send(listeners, 'FLUXIO_INTERNAL_EXECUTE_SWAP', { quoteId: quote.response.quoteId, networkKey: 'base' });
+    expect(result.error).toBeUndefined();
+    expect(capture.sendRawParams.length).toBe(1);
+    const [, , , maxFee, gasLimit] = readTx(capture.sendRawParams[0]);
+    expect(gasLimit * maxFee <= 4362567000000n).toBe(true);
+    infoSpy.mockRestore();
     delete globalThis.fetch;
     delete globalThis.chrome;
   }, E2E_TIMEOUT_MS);
@@ -3726,7 +4012,7 @@ describe('background.bundle.js — g2 constructive + L1 fee preview (prompt 0227
     expect(quote.error).toBeUndefined();
     const preview = await send(listeners, 'FLUXIO_INTERNAL_PREVIEW_SWAP_FEES', { quoteId: quote.response.quoteId });
     expect(preview.error).toBeUndefined();
-    expect(BigInt(preview.response.maxFeeWei)).toBe(4362567000000n + L1_FEE); // identical to the real tip 1e6 fixture
+    expect(BigInt(preview.response.maxFeeWei)).toBe(4726117000000n + L1_FEE); // 429.647 gas (0251) x 11e6 — identical to the real tip 1e6 fixture
     const result = await send(listeners, 'FLUXIO_INTERNAL_EXECUTE_SWAP', { quoteId: quote.response.quoteId, networkKey: 'base' });
     expect(result.error).toBeUndefined();
     expect(result.response.quoteChanged).toBeUndefined();
@@ -4221,6 +4507,7 @@ describe('background.bundle.js — post-approve stale-state revert + haltDetail 
     expect(execLines.length).toBe(1); // tepat satu per EXECUTE
     expect(execLines[0]).toContain('execute base quote ' + quoteId);
     expect(execLines[0]).toContain('ceilings reset/approve/swap');
+    expect(/ est | build /.test(execLines[0])).toBe(false); // 0252: segmen est/build hanya untuk native masuk
     expect(/0x[0-9a-fA-F]{40}/.test(execLines[0])).toBe(false); // tidak pernah alamat
     expect(capture.sendRawParams.length).toBeGreaterThanOrEqual(1);
     infoSpy.mockRestore();

@@ -15,9 +15,11 @@
  *   3. From backend/: node scripts/fetchStartFixture.js
  *
  * Token: FIXTURE_BOT_TOKEN from the terminal environment when set (a
- * TEMPORARY bot made just for this capture — needed because the TRIAL bot
- * is polled by the VM backend, so its getUpdates queue is always empty
- * from the laptop), otherwise the trial bot's own token
+ * TEMPORARY bot made just for this capture — needed because the TRIAL
+ * bot's getUpdates queue came back empty from the laptop that day; the
+ * 0233 guess "it is polled by the VM backend" was later REFUTED by the
+ * VM's own startup log, and the real consumer was never proven),
+ * otherwise the trial bot's own token
  * (config.telegram.bots.test.botToken, i.e. TELEGRAM_BOT_TOKEN_TEST from
  * backend/.env). Never the official bot's, which does not exist on the
  * laptop anyway (deploy lesson 9). The token is never printed and never
@@ -31,16 +33,38 @@
  * own chat; harmless, trial bot). Redaction: first_name/last_name/username
  * on `message.from` and `message.chat` become "redacted"; the chat id is
  * kept on purpose (trial bot, the owner's own chat).
+ *
+ * GROUP MODE (prompt 0250): `node scripts/fetchStartFixture.js --group`
+ * captures the latest real /start sent inside a GROUP and inside a
+ * SUPERGROUP and writes them to
+ * `prompt/evidence/0250-group-start/start-group.json` and
+ * `start-supergroup.json` (whichever chat types are present in the queue;
+ * each run rewrites both when both are there, since a no-offset getUpdates
+ * keeps returning the same pending updates). Differences from the default
+ * mode, all deliberate:
+ *  - the token comes ONLY from FIXTURE_BOT_TOKEN — there is NO fallback to
+ *    any configured bot, so this mode can never read the trial bot's or
+ *    any real bot's queue by accident;
+ *  - redaction is DEEP (startFixtureHelpers.js's redactDeep): every
+ *    first_name / last_name / username / title at any depth becomes
+ *    "redacted" — chat.title and the sender's names included;
+ *  - the fixture is refused (nothing written) if its serialized form
+ *    contains anything shaped like a bot token.
+ * `--out <dir>` (group mode only) redirects the two files to another
+ * directory — for dry runs against a local fake API, never needed by the
+ * owner's real capture.
  */
 import { writeFileSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { config } from '../src/config/env.js';
 import { START_PAYLOAD_PATTERN } from '../src/telegram/startCommands.js';
+import { redactDeep, pickGroupStartUpdates, GROUP_FIXTURE_FILES, BOT_TOKEN_SHAPE } from './startFixtureHelpers.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURE_DIR = path.resolve(__dirname, '../../prompt/evidence/0233-telegram-ads-test');
 const FIXTURE_PATH = path.join(FIXTURE_DIR, 'start-with-payload.json');
+const GROUP_FIXTURE_DIR = path.resolve(__dirname, '../../prompt/evidence/0250-group-start');
 
 function redact(obj) {
   if (!obj) return obj;
@@ -129,7 +153,86 @@ async function main() {
   console.log(`Saved update_id=${fixture.update_id} payload=${payload} to ${FIXTURE_PATH}`);
 }
 
-main().catch((err) => {
+async function callBot(token, method, params) {
+  const res = await fetch(`${config.telegram.apiRoot}/bot${token}/${method}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+    signal: AbortSignal.timeout(15000)
+  });
+  const data = await res.json();
+  if (!data.ok) {
+    console.error(`Telegram ${method} failed: ${data.error_code} ${data.description}`);
+    process.exit(1);
+  }
+  return data.result;
+}
+
+/** Prompt 0250 — see GROUP MODE in this file's header. */
+async function mainGroup(outDir) {
+  const token = process.env.FIXTURE_BOT_TOKEN;
+  if (!token) {
+    console.error('Group mode needs FIXTURE_BOT_TOKEN set in this terminal (a temporary bot). There is no fallback to any configured bot. Nothing fetched.');
+    process.exit(1);
+  }
+  console.log('Using FIXTURE_BOT_TOKEN (temporary fixture bot). Group mode.');
+
+  const me = await callBot(token, 'getMe', {});
+  console.log(`Bot: @${me.username}`);
+
+  // No offset: read-only, confirms nothing.
+  const getUpdatesParams = { timeout: 0, allowed_updates: ['message'] };
+  console.log(`getUpdates params: ${JSON.stringify(getUpdatesParams)}`);
+  const updates = await callBot(token, 'getUpdates', getUpdatesParams);
+
+  // Diagnostic: update_id, chat type, message text and which service flag
+  // is present — never a name, a title or an id of any chat or person.
+  console.log(`Raw updates received: ${updates.length}`);
+  for (const u of updates) {
+    const m = u.message;
+    const service = m
+      ? ['migrate_to_chat_id', 'migrate_from_chat_id', 'new_chat_members', 'group_chat_created', 'supergroup_chat_created'].filter((k) => k in m)
+      : [];
+    console.log(
+      `  update_id=${u.update_id} chat.type=${m?.chat?.type ?? null} text=${JSON.stringify(m?.text ?? null)}${service.length ? ` service=${service.join(',')}` : ''}`
+    );
+  }
+
+  const picked = pickGroupStartUpdates(updates);
+  let written = 0;
+  for (const [type, fileName] of Object.entries(GROUP_FIXTURE_FILES)) {
+    const update = picked[type];
+    if (!update) {
+      console.log(`chat.type=${type}: no pending /start found, ${fileName} NOT written.`);
+      continue;
+    }
+    const serialized = JSON.stringify(redactDeep(update), null, 2) + '\n';
+    if (BOT_TOKEN_SHAPE.test(serialized)) {
+      console.error(`chat.type=${type}: the update contains something shaped like a bot token. ${fileName} NOT written.`);
+      process.exit(1);
+    }
+    mkdirSync(outDir, { recursive: true });
+    const target = path.join(outDir, fileName);
+    writeFileSync(target, serialized);
+    written += 1;
+    console.log(`chat.type=${type}: saved update_id=${update.update_id} text=${JSON.stringify(update.message.text)} to ${target}`);
+  }
+  if (written === 0) {
+    console.error('No /start from a group or supergroup is pending. Send /start (and /start@<this bot username>) inside the test group first, then rerun.');
+    process.exit(1);
+  }
+}
+
+const args = process.argv.slice(2);
+const groupMode = args.includes('--group');
+const outIndex = args.indexOf('--out');
+if (outIndex !== -1 && (!groupMode || !args[outIndex + 1])) {
+  console.error('--out <dir> is only valid together with --group and needs a directory.');
+  process.exit(1);
+}
+const entry = groupMode ? () => mainGroup(outIndex !== -1 ? path.resolve(args[outIndex + 1]) : GROUP_FIXTURE_DIR) : main;
+
+entry().catch((err) => {
   console.error('fetchStartFixture failed:', err.message);
   process.exit(1);
 });

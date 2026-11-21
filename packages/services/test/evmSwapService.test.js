@@ -8,6 +8,8 @@ import { fileURLToPath } from 'node:url';
 import {
   getEvmSwapQuote,
   estimateEvmSwapFeeWei,
+  computeNativePreviewGas,
+  EVM_SWAP_NATIVE_PREVIEW_MARGINS,
   EvmSwapValidationError,
   NATIVE_EVM_SENTINEL,
   EVM_SWAP_EXECUTION_ENABLED,
@@ -845,5 +847,55 @@ describe('EVM tip floor (prompt 0231) — fixtures from the 22 Oktober measureme
     expect(fees.maxPriorityFeePerGas).toBe(1000000n);
     expect(fees.maxFeePerGas).toBe(601000000n);
     expect(fees.maxFeePerGas > getEvmSwapCaps('base').maxFeePerGasCap).toBe(true); // the guard input that halts
+  });
+});
+
+// Prompt 0251 (catatan 19) — gas di balik plafon tampil native masuk.
+// Angka dari kaki nyata: Base 0227 (gas quote/build 330.498, estimasi
+// fase 1 402.727, gasUsed 392.554), BNB 0221 (gas build 268.831, gasUsed
+// 229.452 dipakai sebagai contoh estimasi di BAWAH gas build), Ethereum
+// 0227 (fixture build 456.277).
+describe('computeNativePreviewGas — prompt 0251 (basis = cermin EXECUTE, x1,3; fallback gas quote x1,2)', () => {
+  it('estimasi DI ATAS gas build (Base 0227): basis = estimasi 402.727, gasLimit = floor(x 13 / 10) = 523.545', () => {
+    expect(computeNativePreviewGas({ estimatedGas: 402727n, buildGas: 330498n, quoteGas: 330498n })).toEqual({
+      source: 'estimate', basisGas: 402727n, gasLimit: 523545n, marginLabel: '1.3'
+    });
+  });
+
+  it('estimasi DI BAWAH gas build (BNB 0221): basis = gas build 268.831, BUKAN estimasi — cermin max() milik EXECUTE', () => {
+    const out = computeNativePreviewGas({ estimatedGas: 229452n, buildGas: 268831n, quoteGas: 268831n });
+    expect(out).toEqual({ source: 'estimate', basisGas: 268831n, gasLimit: 349480n, marginLabel: '1.3' });
+    // gasLimit yang ditandatangani EXECUTE untuk basis yang sama: floor(268.831 x 1,2) = 322.597.
+    // Plafon harus menutupnya; estimasi saja x1,3 (298.287) TIDAK menutup dan akan memantulkan setiap Confirm BNB.
+    expect(out.gasLimit >= (268831n * 12n) / 10n).toBe(true);
+    expect((229452n * 13n) / 10n < (268831n * 12n) / 10n).toBe(true);
+  });
+
+  it('ruang 8,33%: basis yang naik 8% antara Review dan Confirm masih di dalam plafon, naik 9% tidak (kasus BNB, baseFee 0)', () => {
+    const ceilingGas = computeNativePreviewGas({ estimatedGas: 268831n, buildGas: 268831n, quoteGas: 268831n }).gasLimit; // 349.480
+    expect((290000n * 12n) / 10n <= ceilingGas).toBe(true); // +7,9% -> 348.000
+    expect((293100n * 12n) / 10n <= ceilingGas).toBe(false); // +9,0% -> 351.720
+  });
+
+  it('fallback gas quote x1,2 bila estimasi ATAU gas build tidak ada — angka yang sama dengan rumus 0213 (322.597)', () => {
+    const expected = { source: 'quote', basisGas: 268831n, gasLimit: 322597n, marginLabel: '1.2' };
+    expect(computeNativePreviewGas({ estimatedGas: null, buildGas: 268831n, quoteGas: 268831n })).toEqual(expected);
+    expect(computeNativePreviewGas({ estimatedGas: 402727n, buildGas: null, quoteGas: 268831n })).toEqual(expected);
+    expect(computeNativePreviewGas({ quoteGas: 268831n })).toEqual(expected);
+    expect(computeNativePreviewGas({ estimatedGas: 0n, buildGas: 268831n, quoteGas: '268831' })).toEqual(expected);
+    expect(computeNativePreviewGas({ estimatedGas: 'bukan angka', buildGas: 268831n, quoteGas: 268831n })).toEqual(expected);
+  });
+
+  it('tanpa angka gas yang bisa dipakai sama sekali: melempar, tidak pernah menebak', () => {
+    expect(() => computeNativePreviewGas({ quoteGas: 0n })).toThrow(EvmSwapValidationError);
+    expect(() => computeNativePreviewGas({ quoteGas: null })).toThrow(EvmSwapValidationError);
+  });
+
+  it('kunci margin pemilik: estimasi 13/10 berlabel 1.3, fallback 12/10 berlabel 1.2', () => {
+    expect(EVM_SWAP_NATIVE_PREVIEW_MARGINS).toEqual({
+      estimate: { numerator: 13n, denominator: 10n, label: '1.3' },
+      quote: { numerator: 12n, denominator: 10n, label: '1.2' }
+    });
+    expect(Object.isFrozen(EVM_SWAP_NATIVE_PREVIEW_MARGINS)).toBe(true);
   });
 });
